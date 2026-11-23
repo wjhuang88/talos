@@ -894,40 +894,53 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
         entries: target.entries.clone(),
         attributes: target.attributes.clone(),
     };
-    corrupt.attributes.insert(
-        "src/.gitattributes".to_owned(),
-        b"*.txt filter=lfs invalid$name\n".to_vec(),
-    );
-    assert!(
-        super::checkout_state::select_captured_target_filter(
-            &corrupt,
-            "src/inside.txt",
-            gix_attributes::glob::pattern::Case::Sensitive,
-        )
-        .is_err()
-    );
+    let kind = gix::ObjectId::from_hex(target.commit.as_bytes())
+        .expect("committed test OID").kind();
+
+    // Preserve the malformed blob's internal OID integrity; otherwise the
+    // hash check refuses first and the strict parser never gets exercised.
+    let malformed = b"*.txt filter=lfs invalid$name\n";
+    let malformed_oid = gix::objs::compute_hash(kind, gix::objs::Kind::Blob, malformed)
+        .expect("hash malformed test bytes");
+    corrupt.attributes.insert("src/.gitattributes".into(), malformed.to_vec());
+    corrupt.entries.get_mut("src/.gitattributes")
+        .expect("captured nested source").1 = malformed_oid.to_string();
+    let error = super::checkout_state::select_captured_target_filter(
+        &corrupt, "src/inside.txt", gix_attributes::glob::pattern::Case::Sensitive,
+    ).expect_err("invalid assignment must be parsed and refused");
+    assert!(matches!(&error, super::GitToolError::InvalidInput(reason)
+        if reason.contains("Malformed supplied target attributes")),
+        "malformed source must reach strict parser, not OID failure: {error:?}");
+
+    // Each rejection starts from a fresh, coherent captured target. A missing
+    // entry must fail the exact source-completeness check instead of inheriting
+    // the previous corruption's unrelated hash mismatch.
+    corrupt.entries = target.entries.clone();
+    corrupt.attributes = target.attributes.clone();
     corrupt.attributes.remove("src/.gitattributes");
-    assert!(
-        super::checkout_state::select_captured_target_filter(
-            &corrupt,
-            "src/inside.txt",
-            gix_attributes::glob::pattern::Case::Sensitive,
-        )
-        .is_err(),
-        "missing committed nested attribute bytes must be rejected"
-    );
-    corrupt.attributes.insert(
-        "../outside/.gitattributes".to_owned(),
-        b"*.txt filter=untrusted\n".to_vec(),
-    );
-    assert!(
-        super::checkout_state::select_captured_target_filter(
-            &corrupt,
-            "src/inside.txt",
-            gix_attributes::glob::pattern::Case::Sensitive,
-        )
-        .is_err()
-    );
+    let error = super::checkout_state::select_captured_target_filter(
+        &corrupt, "src/inside.txt", gix_attributes::glob::pattern::Case::Sensitive,
+    ).expect_err("missing committed attribute bytes must be refused");
+    assert!(matches!(&error, super::GitToolError::InvalidInput(reason)
+        if reason.contains("Target attribute blob bytes missing")),
+        "missing bytes must reach completeness validator: {error:?}");
+
+    // A traversal-spelled source with a recorded matching blob OID and bytes
+    // must reach path validation rather than fail source-set completeness.
+    corrupt.entries = target.entries.clone();
+    corrupt.attributes = target.attributes.clone();
+    let traversal = b"*.txt filter=untrusted\n";
+    let traversal_oid = gix::objs::compute_hash(kind, gix::objs::Kind::Blob, traversal)
+        .expect("hash coherent traversal fixture");
+    corrupt.entries.insert("../outside/.gitattributes".into(),
+        (0o100644, traversal_oid.to_string()));
+    corrupt.attributes.insert("../outside/.gitattributes".into(), traversal.to_vec());
+    let error = super::checkout_state::select_captured_target_filter(
+        &corrupt, "src/inside.txt", gix_attributes::glob::pattern::Case::Sensitive,
+    ).expect_err("traversal source must be refused");
+    assert!(matches!(&error, super::GitToolError::InvalidInput(reason)
+        if reason.contains("Invalid supplied target attribute source")),
+        "traversal must reach path validator: {error:?}");
     assert!(
         super::checkout_state::select_captured_target_filter(
             &target,
@@ -939,6 +952,7 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
 
     // An invented source absent from the tree entry index cannot override
     // committed rules, even if its text is syntactically well formed.
+    corrupt.entries = target.entries.clone();
     corrupt.attributes = target.attributes.clone();
     corrupt.attributes.insert(
         "src/other/.gitattributes".to_owned(),
@@ -1002,6 +1016,69 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
                 native.stderr.len()
             );
         }
+    }
+}
+
+
+#[test]
+fn gix_target_attribute_depth_and_nested_macro_match_native_frozen_index() {
+    // After commit the index and target tree contain exactly the same
+    // attribute blobs. The test-only --cached oracle also runs on Git 2.36,
+    // which does not implement --source=HEAD. No intervening file edits.
+    let dir = tempfile::tempdir().expect("frozen attribute hierarchy fixture");
+    let root = dir.path();
+    for name in ["!nested", "macros"] {
+        std::fs::create_dir_all(root.join(name)).expect("nested fixture");
+    }
+    std::fs::write(
+        root.join(".gitattributes"),
+        b"*.txt filter=root\n[attr]rootmacro filter=shared\n*.md rootmacro\n",
+    ).expect("top-level rules and macro");
+    std::fs::write(root.join("!nested/.gitattributes"), b"*.txt filter=punctuation\n")
+        .expect("punctuation-prefixed nested rules");
+    std::fs::write(
+        root.join("macros/.gitattributes"),
+        b"[attr]nestedmacro filter=forged\n*.txt nestedmacro\n",
+    ).expect("nested macro definition must remain inert");
+    for path in ["!nested/file.txt", "macros/file.txt", "macros/file.md"] {
+        std::fs::write(root.join(path), b"fixture\n").expect("tracked file");
+    }
+    let git = |args: &[&str]| {
+        let result = std::process::Command::new("git")
+            .current_dir(root).args(args)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_ATTR_NOSYSTEM", "1")
+            .env("HOME", root)
+            .env("XDG_CONFIG_HOME", root.join("xdg"))
+            .output().expect("native test-only Git fixture");
+        assert!(result.status.success(), "Git fixture command {:?} failed: {}",
+            args, String::from_utf8_lossy(&result.stderr));
+        result
+    };
+    git(&["init", "-q"]);
+    git(&["add", "--", ".gitattributes", "!nested", "macros"]);
+    git(&["-c", "user.name=I324 Fixture", "-c",
+        "user.email=i324@example.invalid", "commit", "-q", "-m", "frozen rules"]);
+    let commit = git(&["rev-parse", "HEAD"]);
+    let oid = std::str::from_utf8(&commit.stdout).expect("commit OID").trim();
+    let target = super::checkout_state::TargetTree::capture(root, oid)
+        .expect("test-only target tree and admitted source bytes");
+    assert_eq!(target.attributes.len(), 3);
+
+    for (path, expected) in [
+        ("!nested/file.txt", "filter=punctuation"),
+        ("macros/file.txt", "filter=root"),
+        ("macros/file.md", "filter=shared"),
+    ] {
+        let selection = super::checkout_state::select_captured_target_filter(
+            &target, path, gix_attributes::glob::pattern::Case::Sensitive,
+        ).expect("pure supplied gix attribute evaluation");
+        assert_eq!(selection.as_deref(), Some(expected), "gix filter at {path}");
+        let native = git(&["check-attr", "-z", "--cached", "filter", "--", path]);
+        let expected_native = expected.strip_prefix("filter=").expect("filter fixture");
+        let expected_bytes = format!("{path}\0filter\0{expected_native}\0");
+        assert_eq!(native.stdout, expected_bytes.as_bytes(),
+            "Git 2.36-compatible frozen-index attribute oracle differs at {path}");
     }
 }
 
