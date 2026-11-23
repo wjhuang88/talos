@@ -1,5 +1,17 @@
 # I300 Git Authorization Migration Inventory
 
+On Windows, prepared Checkout and Commit can use a Scoop Git installation with
+the default `GIT_INSTALL_ROOT`. The approval includes Read access to the
+`shims/git.shim` mapping and the selected `apps/git/current/cmd/git.exe`, and
+Execute access to the selected Git. A changed mapping or installation requires
+a fresh plan. The supported mapping contains a single literal path to that
+executable. Other configuration and repository redirects retain their existing
+authorization requirements.
+
+Git must also support the attribute and configuration queries used during
+discovery. With Git 2.36.1, attribute-path discovery can still refuse the
+operation. Compatibility with those old commands is tracked in #919.
+
 ## Current delivery — 2026-10-26
 
 I300/T7 is Complete / Closed. #735 merged as `ee84889fd19c590fdcc125cb971143dffd3cfb94`.
