@@ -2,9 +2,9 @@
 
 Complete / Closed via #1007, f4eb947c. [Story, acceptance and required reads](active/GIT-ENV-001-scoop-install-root.md).
 
-## SEARCH-001-D3-T5 / I335 / #1001 — proposed bounded real Bing transport
+## SEARCH-001-D3-T5 / I335 / #1001 — Complete / Closed upon owner-first closeout (bounded opt-in)
 
-[Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): Active / Claimed PROPOSED through governance #1002; technical source implementation first, explicit opt-in only after claim merge, no default/public Bing WWW activation; #1000 supplier/LLM output rights remain separate and unproven, #957 T3b Blocked / Unclaimed.
+[Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): claim #1002 merged before [implementation #1003](https://github.com/wjhuang88/talos/pull/1003); source **Completion Commit `bab2bdf31fc8200758397d38077dab57b9dd1aa4`**. [Exact-head CI 8/8](https://github.com/wjhuang88/talos/actions/runs/45160764389) and independent [Copilot APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725) with clean merge CAS. Real preapproved dual-host WWW→CN transport, source-local typed-failure fallback and explicit `[search] backend = "bing-dual"` only; default DDG-first/CN-only Auto and Tool schema preserved. Issue #1001 may close after this owner-first governance publication. Supplier/output rights #1000, #957 default/live, #937 and Epic #624 remain unresolved/open; not production admission.
 
 ## SEARCH-001-D3-T4 / I333 / #991 — Complete / Closed (offline-only technical integration)
 

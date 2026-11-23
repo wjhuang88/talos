@@ -2,9 +2,9 @@
 
 [Owner](backlog/active/GIT-ENV-001-scoop-install-root.md). Complete / Closed via #1007, f4eb947c. Git 2.36.1 query support remains with #919.
 
-## SEARCH-001-D3-T5 / I335 — proposed real Bing dual-host implementation (no production admission)
+## SEARCH-001-D3-T5 / I335 — Complete / Closed upon owner-first closeout (explicit opt-in only)
 
-[Owner](backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](iterations/I335-search-bing-dual-runtime.md) / [Issue #1001](https://github.com/wjhuang88/talos/issues/1001): **Active / Claimed PROPOSED under governance PR #1002**; ineffective until main merge. Real approved opt-in `SearchTransport` WWW→CN code and deterministic offline fixtures; default DDG-first/CN-only unchanged. External rights [#1000](https://github.com/wjhuang88/talos/issues/1000) and T3b/#957 live/default admission remain blocked.
+[Owner](backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](iterations/I335-search-bing-dual-runtime.md) / [Issue #1001](https://github.com/wjhuang88/talos/issues/1001): governance claim #1002 effective, [source PR #1003](https://github.com/wjhuang88/talos/pull/1003) **Completion Commit `bab2bdf31fc8200758397d38077dab57b9dd1aa4`**. Exact-head [CI #45160764389](https://github.com/wjhuang88/talos/actions/runs/45160764389) **8/8 SUCCESS**, Copilot independent [APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725), merge-time CAS. Real preapproved bounded `SearchTransport` with explicit `backend = "bing-dual"` opt-in, WWW-first/CN only on typed source-local outage, fail-closed security/proxy/budget/cancel; original DDG-first/CN-only Auto and public schema unchanged. Technical slice closes on this owner-first documentation publication and #1001 Issue synchronization. **No** vendor/output rights or default/live activation: [#1000](https://github.com/wjhuang88/talos/issues/1000) remains unverified, #957 T3b blocked, #937/#624 remain Open.
 
 ## SEARCH-001-D3-T4 / I333 — Complete / Closed upon owner-first closeout (offline-only)
 
