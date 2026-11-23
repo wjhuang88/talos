@@ -8,7 +8,7 @@
 
 **保留兼容旧版 Git 的现有受控 Git CLI 预检；仅替换旧版不支持的具体查询动作。** 系统 Git 仍负责最终经过审批的写操作。拒绝自动升级为全量 gix 重写、Git 版本硬编码分支、环境变量放宽或未经审批的新 CLI 探测。
 
-2026-11-21 [Windows 原生报告](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md) 在官方 SHA-256 固定的 MinGit 2.36.1 与选定的 Scoop Git 2.36.1 上逐命令复现：`git var GIT_ATTR_SYSTEM/GLOBAL`、`GIT_CONFIG_SYSTEM/GLOBAL`、`GIT_SHELL_PATH` **五项均返回 129 / unsupported-variable**，`git check-attr --source=HEAD` 返回 **129 / unsupported-option**。普通 `git check-attr` 和 `--cached` 各自可用，且语义不同。**六项为候选最小替换范围**，不能推导所有 `git var`、`git config`、`git --exec-path`、ref 检查都不可用；11 月 17 日的配置/receiver 失败仍需单独判根因。固定脚本在隔离的 HOME/config 下执行，**不代表**原始 Scoop 环境产品验收；17 MiB Checkout/Commit 仍在 `GIT_INSTALL_ROOT` 安全门禁处失败。
+2026-11-21 [Windows 原生报告](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md) 在官方 SHA-256 固定的 MinGit 2.36.1 与选定的 Scoop Git 2.36.1 上逐命令复现：`git var GIT_ATTR_SYSTEM/GLOBAL`、`GIT_CONFIG_SYSTEM/GLOBAL`、`GIT_SHELL_PATH` **五项均返回 129 / unsupported-variable**，`git check-attr --source=HEAD` 返回 **129 / unsupported-option**。普通 `git check-attr` 和 `--cached` 各自可用，且语义不同。**六项为候选最小替换范围**，不能推导所有 `git var`、`git config`、`git --exec-path`、ref 检查都不可用；11 月 17 日的配置/receiver 失败仍需单独判根因。固定脚本在隔离的 HOME/config 下执行，**不代表**原始 Scoop 环境产品验收；该历史报告中的 17 MiB Checkout/Commit 仍在 `GIT_INSTALL_ROOT` 安全门禁处失败；之后独立的 GIT-ENV-001 / #1007 已在 main 合并，修复了受控 Scoop 环境准入，但原生 Git 2.36.1 仍阻塞于本 Issue 的不兼容属性查询。
 
 ## 保留哪些 CLI
 
@@ -33,6 +33,7 @@
 1. 按命令逐项确认旧版失败，而非按整个预检阶段假定不能运行 CLI；记录 native Git 2.36.1 和新版 Git exit code/stdout/stderr。
 2. 对**新增替代路径**验证没有未经授权的外部进程、隐式 I/O、权限扩张和源遗漏；不要求保留的合法 CLI 零调用。
 3. 比较属性根和过滤器预测，覆盖缺失变出现、配置/可执行文件替换、Unicode/空格、不同安装和 17 MiB Checkout/Commit。
-4. 新 CLI 操作或新 authority carrier 先单独决策；独立安全/API 审查与维护者明确接受后才允许生产切换；PR #928/#931 保持 Draft，#919 保持 Open，直至真实验收。
+4. **D1 — 架构 ADR 接受**：独立 Git 权限/安全/API 审查通过、维护者针对精确文本另行明确最终接受、ADR 精确提交 CI 与治理检查完成后，才可合并 #931 作为**架构约束决策**。此前保持 Proposed / NOT ACCEPTED。原则同意继续开发不等于最终接受；仓库的强制独立安全审查不允许以单维护者豁免。
+5. **D2 — 生产实现验收**：针对每一条替代路径证明选定 writer 的真实来源、精确授权的配置/属性/树对象与祖先 Read、缺失源证据、无隐藏子进程、失效重验和权限效果；原始 Scoop 环境的 Git 2.36.1 与新版 Git 17 MiB Prepared Checkout/Commit、拒绝/过期测试和实施 PR 精确提交 CI 均完成，且获得必要独立审查与最终合并授权后才允许生产启用和关闭 #919。**D2 不是纯架构 ADR 在 D1 阶段的循环先决条件，D1 也不会自动授予任何运行时新权限。**
 
 这是**重新界定的安全决策申请**，不是允许全面替换旧的 Git CLI 探测，也不是已经完成的 Git 2.36 兼容性结果。

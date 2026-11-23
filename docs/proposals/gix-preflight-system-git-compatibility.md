@@ -10,7 +10,7 @@
 
 **这些结果只能证明属性查询确实不兼容，不证明整个 Git CLI 预检不兼容。** 配置路径失效 5 项、URL rewrite/tracking 3 项及其他接收端、测试夹具错误必须独立判因。
 
-2026-11-21 [原生 Windows 逐命令报告](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md)：官方 pinned MinGit 2.36.1 与 Scoop Git 2.36.1 的五种 `git var` 查询全部 129 / unsupported-variable，`check-attr --source=HEAD` 为 129 / unsupported-option；普通与 `--cached` 模式通过。验证使用隔离的子进程环境，不能证明原始 Scoop 环境、安装系统属性根或最终 Checkout/Commit 已兼容。Rust gix 候选 15/15 通过；17 MiB Checkout/Commit 仍在环境变量门禁前失败。ADR 尚未通过独立审查，不允许生产接通。
+2026-11-21 [原生 Windows 逐命令报告](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md)：官方 pinned MinGit 2.36.1 与 Scoop Git 2.36.1 的五种 `git var` 查询全部 129 / unsupported-variable，`check-attr --source=HEAD` 为 129 / unsupported-option；普通与 `--cached` 模式通过。验证使用隔离的子进程环境，不能证明原始 Scoop 环境、安装系统属性根或最终 Checkout/Commit 已兼容。Rust gix 候选 15/15 通过；该历史报告中的 17 MiB Checkout/Commit 仍在环境变量门禁前失败；之后 GIT-ENV-001 / #1007 已独立合并其 Scoop 安全准入修复，Git 2.36.1 仍在 #919 不兼容属性查询处失败。ADR 尚未通过独立审查，不允许生产接通。
 
 ## 目标与保留行为
 
@@ -37,6 +37,13 @@
 - 用 recording sentinel 证明**新增替代路径**没有未获授权的 Git 或其他子进程；已获批准且保留的 Git CLI 调用是正常预检行为，不属于零子进程断言。
 - 检查 system/global attributes、相对与缺失路径、空源、filter 预测、HOME/XDG、不同安装、Unicode/空格、替换/重验、>16MiB Prepared Checkout/Commit。
 - 保留 ADR-089 Accepted 合同，拟变更的命令权限和新增路径必须单独安全/API 审查、维护者明确批准。更新 Rust locked、Windows native 和精确提交 CI 证据后才可宣布 #919 完成。
+
+## 独立的决策与实施验收门槛（2026-11-23）
+
+- **D1 设计决策 / ADR 合并**：先由独立 Git 权限/安全/API 审查者核验精确的局部兼容替换边界和拒绝语义，再由维护者对**精确修订文本正式接受**；同时要求 ADR PR 精确 HEAD CI、两项治理检查及合并前 CAS。此时允许合入**仅规定约束、不实际授予生产新权限**的 ADR；原则批准开发或 CI 通过都不能替代独立审查。
+- **D2 生产实现 / #919 完成**：必须在替代路径实际接入之前独立审查其权限载体和具体来源，证明选定 system Git 编译默认路径/属性来源、每次精确 Read/metadata 与对象授权、缺失来源、失效重验、实际 hooks/filters/receiver 效果和无隐藏子进程，并获得原始环境 Git 2.36.1 与新版 Git 17 MiB Checkout/Commit 原生验收及实施 HEAD CI。没有这些证据不得合并生产开关或宣称兼容性。**D2 不作为 D1 的循环依赖，D1 通过也不代表 D2 已获批准。**
+
+当前 ADR 仍 **Proposed / NOT ACCEPTED**；#931 不得以单维护者免审方式跳过安全 review，#928 与 #919 的原生验收和生产交付仍独立开放。
 
 ## 历史范围说明
 
