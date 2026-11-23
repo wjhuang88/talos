@@ -249,7 +249,7 @@ pub(super) fn select_captured_target_filter(
                 ));
             }
             let actual = gix::objs::compute_hash(hash_kind, gix::objs::Kind::Blob, bytes)
-                .map_err(|_| GitToolError::InvalidInput("Target attribute OID hash failed".into()))?;
+                .map_err(|_| GitToolError::InvalidInput("Target blob hash failed".into()))?;
             if actual != recorded {
                 return Err(GitToolError::InvalidInput(
                     "Target attribute bytes do not match the recorded blob OID".into(),

@@ -1217,12 +1217,8 @@ fn gix_pure_candidate_no_child_fixture() {
     for commit in ["0".repeat(40), "0".repeat(64)] {
         let commit_id =
             gix::ObjectId::from_hex(commit.as_bytes()).expect("synthetic hash-kind fixture");
-        let blob_id = gix::objs::compute_hash(
-            commit_id.kind(),
-            gix::objs::Kind::Blob,
-            attrs,
-        )
-        .expect("pure in-memory Git blob hashing");
+        let blob_id = gix::objs::compute_hash(commit_id.kind(), gix::objs::Kind::Blob, attrs)
+            .expect("pure in-memory Git blob hashing");
         let target = super::checkout_state::TargetTree {
             commit,
             tree: String::new(),
