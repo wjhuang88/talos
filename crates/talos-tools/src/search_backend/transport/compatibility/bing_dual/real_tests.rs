@@ -258,13 +258,9 @@ async fn proxy_dns_failure_is_shared_infrastructure_and_must_not_rotate_bing_hos
     use crate::search_backend::transport::TransportProxy;
 
     let endpoints = PreparedBingDualHost::destinations().expect("two frozen hosts");
-    let proxy = TransportProxy::from_snapshot(
-        "http://proxy-fixture.invalid:3128",
-        "",
-        &endpoints,
-    )
-    .expect("proxy policy")
-    .expect("both hosts use proxy");
+    let proxy = TransportProxy::from_snapshot("http://proxy-fixture.invalid:3128", "", &endpoints)
+        .expect("proxy policy")
+        .expect("both hosts use proxy");
     let scope = ToolNetworkScope::new_configuration(
         endpoints.to_vec(),
         Some(proxy.endpoint().clone()),
