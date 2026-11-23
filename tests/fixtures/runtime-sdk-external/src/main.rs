@@ -5,6 +5,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 mod api_surface;
+#[cfg(feature = "local-storage")]
+mod local_storage;
 mod network;
 mod provider;
 mod safety;
@@ -300,6 +302,8 @@ async fn run() -> Result<()> {
     run_minimal_runtime().await?;
     network::verify().await?;
     run_durable_session().await?;
+    #[cfg(feature = "local-storage")]
+    local_storage::verify().await?;
     #[cfg(feature = "coding")]
     run_coding_preset().await?;
     validate_fallback_policies();
