@@ -9,6 +9,30 @@ use gix::bstr::ByteSlice;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 
+/// The Git --show-origin --null wire stream contains origin/record pairs,
+/// whose cross-key order is security-relevant even when value maps match.
+fn ordered_file_origin_records(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
+    let payload = bytes.strip_suffix(b"\0").expect("terminated origin stream");
+    let fields = payload.split(|byte| *byte == 0).collect::<Vec<_>>();
+    assert_eq!(fields.len() % 2, 0, "each record needs a file origin");
+    fields
+        .chunks_exact(2)
+        .map(|pair| {
+            let origin = std::str::from_utf8(pair[0])
+                .expect("ASCII test fixture origin")
+                .strip_prefix("file:")
+                .expect("file origin");
+            // Native Git for Windows uses forward slashes; Rust PathBuf can
+            // serialize the same admitted source using backslashes.
+            #[cfg(windows)]
+            let origin = origin.replace('\\', "/").trim_matches('"').to_ascii_lowercase();
+            #[cfg(not(windows))]
+            let origin = origin.to_owned();
+            (origin, pair[1].to_vec())
+        })
+        .collect()
+}
+
 #[test]
 fn gix_branch_name_validation_requires_no_git_child() {
     // The gix-validate API takes a *complete* Git ref, not a short
@@ -168,7 +192,9 @@ fn gix_admitted_config_graph_can_emit_host_records_without_git() {
     let serialized = sources
         .ordered_host_output(&[root], &env, None)
         .expect("pure gix-backed serialization");
-    let parsed = super::config_state::parse_host(&serialized).expect("existing host parser");
+    let (parsed, origins) = super::config_state::parse_origins_for_tests(&serialized)
+        .expect("origin-bearing host parser");
+    assert!(origins.contains(&included), "include origin must be parsed");
     assert_eq!(
         parsed
             .get(b"core.bare".as_slice())
@@ -257,13 +283,53 @@ fn gix_admitted_host_output_matches_native_config_values_and_stales() {
     let actual = sources
         .ordered_host_output(std::slice::from_ref(&root), &env, None)
         .expect("serialize only admitted gix records");
-    let expected_values =
-        super::config_state::parse_host(&native.stdout).expect("native host records");
-    let actual_values = super::config_state::parse_host(&actual).expect("gix host records");
+    let (expected_values, _) = super::config_state::parse_origins_for_tests(&native.stdout)
+        .expect("native origin-bearing config records");
+    let (actual_values, _) = super::config_state::parse_origins_for_tests(&actual)
+        .expect("candidate origin-bearing config records");
+    assert_eq!(actual_values, expected_values, "configuration values diverged");
     assert_eq!(
-        actual_values, expected_values,
-        "configuration values diverged"
+        ordered_file_origin_records(&actual),
+        ordered_file_origin_records(&native.stdout),
+        "ordered file-origin/record pairs differ from native Git"
     );
+
+    // A different-key order change is invisible to a BTreeMap of values,
+    // but the actual production host verifier rejects the altered stream.
+    let fields = actual[..actual.len() - 1]
+        .split(|byte| *byte == 0)
+        .collect::<Vec<_>>();
+    let mut pairs = fields.chunks_exact(2)
+        .map(|pair| (pair[0].to_vec(), pair[1].to_vec()))
+        .collect::<Vec<_>>();
+    let marker = pairs.iter()
+        .position(|(_, record)| record.starts_with(b"fixture.marker"))
+        .expect("marker fixture");
+    let include = pairs.iter()
+        .position(|(_, record)| record.starts_with(b"include.path"))
+        .expect("include fixture");
+    pairs.swap(marker, include);
+    let mut reordered = Vec::new();
+    for (origin, record) in pairs {
+        reordered.extend_from_slice(&origin);
+        reordered.push(0);
+        reordered.extend_from_slice(&record);
+        reordered.push(0);
+    }
+    let (reordered_values, reordered_origins) =
+        super::config_state::parse_origins_for_tests(&reordered)
+            .expect("reordered records still have valid framing");
+    assert_eq!(reordered_values, actual_values, "fixture must only reorder keys");
+    assert_eq!(
+        reordered_origins,
+        super::config_state::parse_origins_for_tests(&actual)
+            .expect("original origins").1
+    );
+    let verifier = super::config_state::ChildConfig::capture(&actual, &fixture)
+        .expect("prepare real host stream verifier");
+    verifier.verify_host(&actual).expect("original order remains valid");
+    assert!(verifier.verify_host(&reordered).is_err(),
+        "the actual host verifier must reject cross-key reordering");
 
     // Mutating an included source after the snapshot must fail revalidation.
     std::fs::write(&included, b"[fixture]\n marker=changed\n").expect("change included source");
@@ -297,7 +363,9 @@ fn gix_host_candidate_retains_missing_root_and_rejects_later_appearance() {
     let output = sources
         .ordered_host_output(&roots, &env, None)
         .expect("serialize admitted root graph only");
-    let records = super::config_state::parse_host(&output).expect("host records");
+    let (records, origins) = super::config_state::parse_origins_for_tests(&output)
+        .expect("origin-bearing host records");
+    assert!(origins.contains(&present_global));
     assert_eq!(
         records
             .get(b"fixture.marker".as_slice())
@@ -373,7 +441,8 @@ fn gix_gitdir_conditional_requires_admitted_repository_identity() {
         .expect("admit gitdir directory and ancestor identities");
     let records = sources
         .ordered_host_output(std::slice::from_ref(&root), &environment, Some(&gitdir))
-        .and_then(|output| super::config_state::parse_host(&output))
+        .and_then(|output| super::config_state::parse_origins_for_tests(&output)
+            .map(|(values, _)| values))
         .expect("interpret config only after gitdir metadata admission");
     assert_eq!(
         records
@@ -454,13 +523,15 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
             native.status.success(),
             "native Git rejected a valid admitted hasconfig fixture"
         );
-        super::config_state::parse_host(&native.stdout).expect("parse native config records")
+        super::config_state::parse_origins_for_tests(&native.stdout)
+            .expect("parse native origin-bearing config records").0
     };
 
     let sources = capture();
     let matched = sources
         .ordered_host_output(std::slice::from_ref(&root), &environment, None)
-        .and_then(|output| super::config_state::parse_host(&output))
+        .and_then(|output| super::config_state::parse_origins_for_tests(&output)
+            .map(|(values, _)| values))
         .expect("evaluate admitted bytes without a Git process");
     assert_eq!(
         matched
@@ -483,7 +554,8 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
     let sources = capture();
     let unmatched = sources
         .ordered_host_output(std::slice::from_ref(&root), &environment, None)
-        .and_then(|output| super::config_state::parse_host(&output))
+        .and_then(|output| super::config_state::parse_origins_for_tests(&output)
+            .map(|(values, _)| values))
         .expect("evaluate nonmatching admitted URLs");
     assert!(
         !unmatched.contains_key(b"fixture.marker".as_slice()),
