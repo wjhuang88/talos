@@ -776,6 +776,44 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
     )
     .expect("mutated worktree attributes");
 
+    // Even well-formed replacement rules cannot be substituted for the
+    // commit's original .gitattributes bytes: a complete source-name set
+    // alone is not a trustworthy Git tree snapshot.
+    let mut forged = super::checkout_state::TargetTree {
+        commit: target.commit.clone(),
+        tree: target.tree.clone(),
+        entries: target.entries.clone(),
+        attributes: target.attributes.clone(),
+    };
+    forged.attributes.insert(
+        "src/.gitattributes".to_owned(),
+        b"*.txt filter=forged\n".to_vec(),
+    );
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &forged,
+            "src/inside.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err(),
+        "well-formed but forged attribute bytes must fail blob OID binding"
+    );
+    forged.attributes = target.attributes.clone();
+    forged
+        .entries
+        .get_mut("src/.gitattributes")
+        .expect("captured source entry")
+        .1 = "0000000000000000000000000000000000000000".to_owned();
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &forged,
+            "src/inside.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err(),
+        "changed target entry OID must not authenticate valid captured bytes"
+    );
+
     // A pure evaluator must fail closed on corrupt supplied bytes or an
     // untrusted source spelling, without probing the filesystem to recover.
     let mut corrupt = super::checkout_state::TargetTree {
