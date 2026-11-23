@@ -367,6 +367,9 @@ pub enum SearchBackendConfig {
     Auto,
     /// Explicit zero-key DuckDuckGo selection.
     DuckDuckGo,
+    /// Explicit opt-in Bing WWW-first/CN-fallback; Auto remains DDG-first/CN-only.
+    #[serde(rename = "bing-dual")]
+    BingDual,
     /// Explicit premium Tavily selection; credential is resolved separately.
     Tavily,
     /// Explicit caller-configured SearXNG selection.

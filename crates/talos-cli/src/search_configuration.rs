@@ -16,6 +16,10 @@ pub(crate) fn project_search_configuration(config: &Config) -> Result<SearchTool
             reject_inapplicable_search_options(config)?;
             Ok(SearchToolConfiguration::DuckDuckGo)
         }
+        SearchBackendConfig::BingDual => {
+            reject_inapplicable_search_options(config)?;
+            Ok(SearchToolConfiguration::BingDual)
+        }
         SearchBackendConfig::Tavily => {
             if config.search.url.is_some() {
                 bail!("search.url is only valid when search.backend = searxng");
@@ -144,5 +148,24 @@ mod tests {
             project_search_configuration(&config).expect("duckduckgo"),
             SearchToolConfiguration::DuckDuckGo
         ));
+    }
+
+    #[test]
+    fn bing_dual_requires_explicit_backend_and_rejects_unrelated_options() {
+        let mut config = Config::default();
+        assert!(matches!(
+            project_search_configuration(&config).expect("default"),
+            SearchToolConfiguration::Auto
+        ));
+        config.search.backend = SearchBackendConfig::BingDual;
+        assert!(matches!(
+            project_search_configuration(&config).expect("opt-in"),
+            SearchToolConfiguration::BingDual
+        ));
+        config.search.fallback_to_auto = true;
+        assert!(project_search_configuration(&config).is_err());
+        config.search.fallback_to_auto = false;
+        config.search.url = Some("https://unrelated.invalid".into());
+        assert!(project_search_configuration(&config).is_err());
     }
 }

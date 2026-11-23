@@ -14,6 +14,9 @@ pub enum SearchToolConfiguration {
     Auto,
     /// Explicitly select the zero-key DuckDuckGo compatibility candidate.
     DuckDuckGo,
+    /// Explicit opt-in for Bing WWW-first/CN-fallback through the protected prepared transport.
+    /// This does not alter the default Auto route or prove third-party service/output rights.
+    BingDual,
     /// Explicitly select Tavily using a caller-supplied credential.
     Tavily {
         /// Explicit Tavily bearer credential. Debug output is always redacted.
@@ -35,6 +38,7 @@ impl std::fmt::Debug for SearchToolConfiguration {
         match self {
             Self::Auto => f.write_str("SearchToolConfiguration::Auto"),
             Self::DuckDuckGo => f.write_str("SearchToolConfiguration::DuckDuckGo"),
+            Self::BingDual => f.write_str("SearchToolConfiguration::BingDual"),
             Self::Tavily {
                 fallback_to_auto, ..
             } => f

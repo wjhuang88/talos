@@ -2,14 +2,22 @@
 //!
 //! The production compatibility chain is still DDG-first and Bing-CN-only. This module
 //! does not register another SearchBackend, construct a production Tool or dispatch HTTP.
-//! All new WWW/CN end-to-end replay is test-only and never reaches a public network.
+//! Real requests remain reachable only through a separately selected protected BingDual tool;
+//! the deployed Auto chain is unchanged. CI tests use local-only fixtures, not Bing network.
 
+use super::SearchTransport;
 use super::{
     BodyFormat, CompatibilityError, CompatibilityProtocol, Method, PreparedTransportRequest,
     ToolNetworkEndpoint, ToolNetworkManifest, TransportError, Url, encode_form_with_limit,
     headers::CompatibilityHeaders, request_endpoint,
 };
-use crate::search_backend::bing_variants::BingVariant;
+use crate::search_backend::bing_variants::{
+    BingAttempt, BingAvailabilityFailure, BingFallbackGuards, BingNext, BingVariant, next_variant,
+};
+use std::{sync::atomic::Ordering, time::Duration};
+use tokio::time::{Instant, timeout_at};
+
+pub(in crate::search_backend) mod tool;
 
 pub(super) struct PreparedBingDualHost {
     manifest: ToolNetworkManifest,
@@ -116,6 +124,141 @@ impl PreparedBingDualHost {
         PreparedTransportRequest::new(manifest, url, Method::GET, None, BodyFormat::Form)
     }
 }
+
+const BING_SOURCE_TIMEOUT: Duration = Duration::from_secs(15);
+
+impl PreparedBingDualHost {
+    /// Execute a caller-selected, pre-approved Bing family using the existing real HTTP transport.
+    ///
+    /// Both query-bearing requests and permission facets were frozen before approval. The second
+    /// destination is never reconstructed or authorized after a failed first request. No public
+    /// Tool or default SearchRouter automatically calls this path.
+    pub(super) async fn execute(
+        self,
+        transport: &SearchTransport,
+    ) -> Result<super::admission::AdmittedCompatibilityResults, CompatibilityError> {
+        self.execute_with_source_timeout(transport, BING_SOURCE_TIMEOUT)
+            .await
+    }
+
+    // A private deterministic timeout seam permits fast local coverage of source-local
+    // expiry without waiting fifteen seconds. The real tool always uses BING_SOURCE_TIMEOUT.
+    async fn execute_with_source_timeout(
+        self,
+        transport: &SearchTransport,
+        source_timeout: Duration,
+    ) -> Result<super::admission::AdmittedCompatibilityResults, CompatibilityError> {
+        let Self {
+            manifest,
+            www,
+            cn,
+            query,
+            max_results,
+        } = self;
+        if manifest != transport.manifest {
+            return Err(TransportError::Unauthorized.into());
+        }
+        let (first, availability) =
+            Self::attempt(www, &query, max_results, transport, source_timeout).await;
+        let error = match first {
+            Ok(results) => return Ok(results),
+            Err(error) => error,
+        };
+        let Some(availability) = availability else {
+            return Err(error);
+        };
+        // A fresh scoped runtime check is required even though CN was prepared and approved.
+        // Revocation, proxy denial and a depleted shared send budget cannot permit a second host.
+        if let Err(denied) = transport.check(&cn.url, &cn.method) {
+            return Err(denied.into());
+        }
+        let needed = if transport.uses_proxy(&cn.url) { 2 } else { 1 };
+        let send_budget_remaining = transport
+            .budget
+            .attempts
+            .load(Ordering::Relaxed)
+            .checked_add(needed)
+            .is_some_and(|count| count <= transport.budget.max_requests);
+        let guards = BingFallbackGuards {
+            cn_prepared: true,
+            network_permitted: true, // checked above with the original invocation authority
+            proxy_route_prepared: true, // bound by SearchTransport::new_with_proxy
+            invocation_live: transport.budget.check_live().is_ok(),
+            send_budget_remaining,
+        };
+        if next_variant(
+            BingVariant::NonCn,
+            BingAttempt::Unavailable(availability),
+            guards,
+        ) != BingNext::TryCn
+        {
+            return Err(error);
+        }
+        Self::attempt(cn, &query, max_results, transport, source_timeout)
+            .await
+            .0
+    }
+
+    /// Only DNS, refused connect and a strictly source-local timer can classify WWW unavailable.
+    /// Unknown Network errors, HTTP responses, redirects, challenges and parse failures are never
+    /// allowed to rotate a host. The shared transport charges real CONNECT/send/body bytes.
+    async fn attempt(
+        request: PreparedTransportRequest,
+        query: &str,
+        max_results: u32,
+        transport: &SearchTransport,
+        source_timeout: Duration,
+    ) -> (
+        Result<super::admission::AdmittedCompatibilityResults, CompatibilityError>,
+        Option<BingAvailabilityFailure>,
+    ) {
+        if let Err(error) = transport.budget.check_live() {
+            return (Err(error.into()), None);
+        }
+        // Proxied requests resolve/connect to the SHARED proxy peer, not the Bing origin.
+        // A proxy DNS/refusal/timeout cannot prove source-local WWW unavailability and must
+        // never cause disclosure of the same query to a second Bing host.
+        let proxied = transport.uses_proxy(&request.url);
+        let source_deadline =
+            std::cmp::min(Instant::now() + source_timeout, transport.budget.deadline);
+        let result = timeout_at(source_deadline, transport.execute_prepared(request)).await;
+        match result {
+            Ok(Ok(response)) => (
+                super::finish_response(
+                    CompatibilityProtocol::Bing,
+                    query,
+                    max_results,
+                    response,
+                    || transport.budget.check_live(),
+                ),
+                None,
+            ),
+            Ok(Err(TransportError::Dns)) => (
+                Err(TransportError::Dns.into()),
+                (!proxied).then_some(BingAvailabilityFailure::Dns),
+            ),
+            Ok(Err(TransportError::ConnectionRefused)) => (
+                Err(TransportError::ConnectionRefused.into()),
+                (!proxied).then_some(BingAvailabilityFailure::ConnectionRefused),
+            ),
+            Ok(Err(error)) => (Err(error.into()), None),
+            Err(_) => {
+                if transport.budget.check_live().is_ok() {
+                    // This is NOT the global deadline. No retry and no reset of the budget clock.
+                    (
+                        Err(TransportError::Network.into()),
+                        (!proxied).then_some(BingAvailabilityFailure::SourceLocalTimeout),
+                    )
+                } else {
+                    (Err(TransportError::Deadline.into()), None)
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod real_tests;
 
 #[cfg(test)]
 mod tests {
