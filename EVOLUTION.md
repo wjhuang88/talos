@@ -5,6 +5,24 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-21 - Windows Git fixture cleanup is part of test success
+
+- Trigger: both I324 command matrices completed but the script exited 1 during finally cleanup.
+- Symptom: .NET Directory.Delete refused a Git object file.
+- Root cause: Git object files can be read-only on Windows; plain recursive Directory.Delete does not remove them.
+- Fix: validate the resolved generated temp directory, then use literal-path PowerShell removal with Force; both pinned and installed-Git reruns completed with exit 0.
+- Prevention: verify final script exit and cleanup after expected nonzero command probes; retain initial failures separately from repaired reruns.
+- Promoted to rule/check: `scripts/test_i324_legacy_git_query_matrix.ps1` cleanup guard and forced fixture removal.
+
+## 2026-11-17 - Candidate test counts do not prove platform acceptance
+
+- Trigger: #919 native Windows validation ran 12 candidate tests successfully while full Git acceptance failed.
+- Symptom: the zero-child sentinel and gitdir conditional tests were Unix-only; a controlled-environment stale-source test passed while original-environment Checkout/Commit failed.
+- Root cause: test-module success excludes platform-gated cases and does not establish production wiring or original-environment behavior. Sandbox Git ownership variables also differ from the native Scoop environment.
+- Fix: bind evidence to the exact candidate, compiler and native environment; enumerate excluded tests, retain original and controlled results separately, and classify failures before claiming acceptance.
+- Prevention: inspect platform gates and individual large-file outcomes; record failed format/preflight checks even when focused tests pass.
+- Promoted to rule/check: none; findings and remaining gates are recorded in `docs/reference/WINDOWS-VALIDATION-2026-11-17-I324.md`.
+
 ## 2026-11-16 - Truncation must preserve row separators and their budget
 
 - Trigger: independent review of numbered edit previews found two file locations joined on one output row.
