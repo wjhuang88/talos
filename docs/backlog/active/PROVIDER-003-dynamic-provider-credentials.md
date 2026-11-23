@@ -223,3 +223,7 @@ When a child implementation is selected:
 Partial implementation remains owned by the corresponding child Story. New provider mechanisms,
 credential stores, OS keychain support, browser automation, or broader request-replay semantics
 require separate owners or an explicit update to the decomposition before implementation.
+
+## PROVIDER-003-A / I336
+
+Governance #1014 proposes activation of #1013 for the authentication capability ADR and threat model under #132. Ownership takes effect on merge.
