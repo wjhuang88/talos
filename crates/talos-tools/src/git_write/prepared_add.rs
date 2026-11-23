@@ -26,6 +26,9 @@ mod command_evidence;
 mod host_path;
 #[path = "prepared_add/pull_command.rs"]
 mod pull_command;
+#[cfg(windows)]
+#[path = "prepared_add/scoop.rs"]
+mod scoop;
 
 struct ChildInspectionEvidence {
     attributes: Vec<PathBuf>,
@@ -272,6 +275,8 @@ pub(super) struct AddPlan {
     program_entry: ProgramEvidence,
     maintenance_program: Option<PathBuf>,
     sender_program_candidate: Option<PathBuf>,
+    #[cfg(windows)]
+    scoop: Option<scoop::Installation>,
     sender_entry_program: Option<(PathBuf, ProgramEvidence)>,
     sender_program_binding: Option<SenderProgramBinding>,
     config: Option<super::config_state::ConfigState>,
@@ -511,6 +516,8 @@ impl AddPlan {
             ));
         }
         let environment = execution_environment();
+        #[cfg(windows)]
+        let (environment, scoop) = scoop::prepare(environment, &operation)?;
         validate_environment(&environment)?;
         let environment = trace_suppressed_environment(environment);
         let program = resolve_git(&environment)?;
@@ -669,6 +676,27 @@ impl AddPlan {
                 ToolResourceKind::Remote,
             ).with_description("resolve frozen Pull gitdir/commondir and startup core.worktree paths; actual external targets require separate Read admission"));
         }
+        #[cfg(windows)]
+        if let Some(installation) = &scoop {
+            facets.retain(|facet| facet.nature != ToolNature::Execute);
+            facets.push(path_facet(
+                ToolNature::Read,
+                &installation.mapping,
+                "read the fixed Scoop Git launcher mapping",
+            )?);
+            facets.push(path_facet(
+                ToolNature::Read,
+                &installation.target,
+                "bind the Scoop Git executable named by the launcher",
+            )?);
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                installation.target.to_str().ok_or_else(|| {
+                    GitToolError::InvalidInput("Scoop Git path is not UTF-8".into())
+                })?,
+                ToolResourceKind::Command,
+            ));
+        }
         let native_pull_command = match &operation {
             Operation::Pull(pull) => Some(command::FrozenCommand::pull(
                 &program,
@@ -772,6 +800,8 @@ impl AddPlan {
             program_entry,
             maintenance_program: None,
             sender_program_candidate: None,
+            #[cfg(windows)]
+            scoop,
             sender_entry_program: None,
             sender_program_binding: None,
             config,
@@ -846,6 +876,36 @@ impl AddPlan {
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
+        #[cfg(windows)]
+        if let Some(installation) = self.scoop.as_ref()
+            && installation.evidence.is_none()
+        {
+            self.revalidate()?;
+            let mapping = self
+                .receiver_read_path(&installation.mapping, authorizations)?
+                .to_owned();
+            let target = self
+                .receiver_read_path(&installation.target, authorizations)?
+                .to_owned();
+            let native = installation.target.clone();
+            let bound = ReceiverChildExecutable::capture(&native, &target)?;
+            self.scoop
+                .as_mut()
+                .ok_or_else(|| GitToolError::InvalidInput("Missing Scoop binding".into()))?
+                .bind(&mapping, &target, &self.program_entry, &bound.program)?;
+            self.program = bound.canonical;
+            self.program_entry = bound.program;
+            for command in [
+                &mut self.native_commit_command,
+                &mut self.native_checkout_command,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                command.bind_sender_program(&self.program);
+            }
+            return self.request_sender_program().await;
+        }
         if let Some(candidate) = self.sender_program_candidate.take() {
             self.revalidate()?;
             let admitted = self.receiver_read_path(&candidate, authorizations)?;
@@ -4534,6 +4594,12 @@ impl AddPlan {
             config.revalidate()?;
         }
         let current_environment = execution_environment();
+        #[cfg(windows)]
+        let current_environment = if let Some(installation) = &self.scoop {
+            installation.revalidate_environment(current_environment)?
+        } else {
+            current_environment
+        };
         validate_environment(&current_environment)?;
         if trace_suppressed_environment(current_environment) != self.environment {
             return Err(GitToolError::InvalidInput(
@@ -5137,6 +5203,11 @@ impl Eq for ProgramEvidence {}
 
 #[cfg(windows)]
 fn capture_program(path: &Path) -> Result<ProgramEvidence, GitToolError> {
+    capture_bounded_file(path, 64 * 1024 * 1024)
+}
+
+#[cfg(windows)]
+fn capture_bounded_file(path: &Path, limit: usize) -> Result<ProgramEvidence, GitToolError> {
     use std::io::Read;
     use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
     use windows_sys::Win32::Storage::FileSystem::{
@@ -5162,16 +5233,16 @@ fn capture_program(path: &Path) -> Result<ProgramEvidence, GitToolError> {
     let opened = guard.metadata().map_err(|_| invalid())?;
     if !opened.is_file()
         || opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-        || opened.len() > 64 * 1024 * 1024
+        || opened.len() > limit as u64
     {
         return Err(invalid());
     }
     let mut bytes = Vec::new();
     (&mut guard)
-        .take(64 * 1024 * 1024 + 1)
+        .take(limit as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| invalid())?;
-    if bytes.len() > 64 * 1024 * 1024 {
+    if bytes.len() > limit {
         return Err(invalid());
     }
     let after = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
