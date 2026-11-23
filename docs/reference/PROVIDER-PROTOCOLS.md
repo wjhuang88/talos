@@ -390,3 +390,12 @@ expiry. Dispatch and pre-stream retries share the earliest expiry and dispatch
 deadline. A signed turn that depended on a temporary image can only continue if
 its exact wire prefix can be restored. Protected browser tool plans still fail
 before dispatch.
+
+For the explicit model ID `us.anthropic.claude-sonnet-4-20250514-v1:0`,
+a model reasoning budget of at least 1024 and below the output token limit
+enables extended thinking with replay. Talos sends the budget in
+`additionalModelRequestFields.thinking` and streams the returned summary as
+live thinking deltas. The signature stays in private custody. Other routes
+reject explicit budgets, and effort levels are unsupported. The AWS sample
+uses this exact profile in its request.
+[AWS ConverseStream reasoning example](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-runtime_example_bedrock-runtime_ConverseStream_AnthropicClaudeReasoning_section.html)

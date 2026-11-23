@@ -459,3 +459,88 @@ async fn ephemeral_image_retries_before_stream_and_reports_progress() {
     first.assert_async().await;
     second.assert_async().await;
 }
+
+#[tokio::test]
+async fn sonnet_budget_and_live_summary_follow_configured_wire() {
+    use crate::bedrock_provider::{BedrockProvider, FIXTURE};
+    use talos_core::{
+        message::{AgentEvent, Message as History},
+        provider::{LanguageModel, ProviderInvocationEvent},
+    };
+    let model = "us.anthropic.claude-sonnet-4-20250514-v1:0";
+    let options = talos_config::ReasoningOptions {
+        budget_tokens: Some(2000),
+        ..Default::default()
+    };
+    let create = |name, limit| {
+        BedrockProvider::new(
+            "p",
+            name,
+            "us-east-1".into(),
+            Some(limit),
+            true,
+            Default::default(),
+        )
+        .expect("provider")
+    };
+    assert!(
+        create("other", 4096)
+            .with_reasoning(Some(options.clone()))
+            .is_err()
+    );
+    assert!(
+        create(model, 2000)
+            .with_reasoning(Some(options.clone()))
+            .is_err()
+    );
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", mockito::Matcher::Regex("converse-stream$".into()))
+        .match_request(|request| {
+            let body: Value = serde_json::from_slice(request.body().expect("request bytes"))
+                .expect("JSON request");
+            body["additionalModelRequestFields"]
+                == json!({"thinking":{"type":"enabled","budget_tokens":2000}})
+                && body["inferenceConfig"]["maxTokens"] == 4096
+        })
+        .with_body(response(true, ""))
+        .with_header("content-type", "application/vnd.amazon.eventstream")
+        .create_async()
+        .await;
+    let provider = FIXTURE
+        .scope(server.url().parse().expect("fixture URL"), async {
+            create(model, 4096)
+                .with_reasoning(Some(options))
+                .expect("supported budget")
+        })
+        .await;
+    let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+    let mut stream = provider
+        .stream_with_replay_context(
+            &[History::User {
+                content: "inspect".into(),
+            }],
+            &[],
+            ToolProtocol::Native,
+            tx,
+            &[],
+            vec![],
+            vec![],
+        )
+        .await
+        .expect("signed stream");
+    let mut summary = String::new();
+    let mut ended = false;
+    while let Some(event) = stream.recv().await {
+        match event {
+            ProviderInvocationEvent::Legacy(AgentEvent::ThinkingDelta { delta }) => {
+                summary.push_str(&delta)
+            }
+            ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd { .. }) => ended = true,
+            _ => {}
+        }
+    }
+    assert_eq!(summary, "private thought");
+    assert!(ended);
+    mock.assert_async().await;
+}

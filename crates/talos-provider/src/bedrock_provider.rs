@@ -26,6 +26,7 @@ pub(crate) struct BedrockProvider {
     model: String,
     region: String,
     limit: Option<u32>,
+    budget: Option<u32>,
     allow_replay: bool,
     timeout: ProviderTimeoutConfig,
 }
@@ -48,9 +49,34 @@ impl BedrockProvider {
             model: model.into(),
             region,
             limit,
+            budget: None,
             allow_replay,
             timeout,
         })
+    }
+    pub(crate) fn with_reasoning(
+        mut self,
+        options: Option<talos_config::ReasoningOptions>,
+    ) -> ProviderResult<Self> {
+        let Some(options) = options else {
+            return Ok(self);
+        };
+        if options.effort.is_some() {
+            return Err(ProviderError::InvalidResponse(
+                "Bedrock reasoning effort is unsupported on this route".into(),
+            ));
+        }
+        if let Some(budget) = options.budget_tokens {
+            if self.model != "us.anthropic.claude-sonnet-4-20250514-v1:0"
+                || !self.allow_replay
+                || budget < 1024
+                || self.limit.is_none_or(|limit| budget >= limit)
+            {
+                return Err(ProviderError::InvalidResponse("Bedrock thinking budget requires the supported Sonnet 4 profile, replay and an output limit above the budget (minimum 1024)".into()));
+            }
+            self.budget = Some(budget);
+        }
+        Ok(self)
     }
 }
 
@@ -218,12 +244,17 @@ impl BedrockProvider {
 
     async fn run(
         &self,
-        body: serde_json::Value,
+        mut body: serde_json::Value,
         protocol: ToolProtocol,
         sender: Sink,
         progress: Option<&mpsc::UnboundedSender<ProviderProgress>>,
         expires: Option<std::time::Instant>,
     ) -> ProviderResult<()> {
+        if let Some(budget) = self.budget {
+            body["additionalModelRequestFields"] =
+                serde_json::json!({"thinking":{"type":"enabled","budget_tokens":budget}});
+        }
+        let preview_summary = self.budget.is_some();
         let payload = serde_json::to_vec(&body)
             .map_err(|_| ProviderError::InvalidResponse("invalid Bedrock request body".into()))?;
         let deadline =
@@ -306,6 +337,7 @@ impl BedrockProvider {
         let idle = Duration::from_secs(self.timeout.stream_idle_timeout_secs);
         tokio::spawn(async move {
             let mut stream = ConverseStream::new(protocol);
+            stream.preview_summary = preview_summary;
             let mut timeout = first;
             let result: ProviderResult<()> = async {
                 loop {

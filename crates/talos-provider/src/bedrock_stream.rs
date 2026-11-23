@@ -25,6 +25,7 @@ enum Block {
 
 #[derive(Default)]
 pub(crate) struct ConverseStream {
+    pub(crate) preview_summary: bool,
     textual: Option<(ToolProtocol, String)>,
     started: bool,
     open: BTreeMap<u32, Block>,
@@ -186,7 +187,14 @@ impl ConverseStream {
                         return Err(invalid("Bedrock block kind changed"));
                     };
                     match key.as_str() {
-                        "text" => text.push_str(fragment),
+                        "text" => {
+                            text.push_str(fragment);
+                            if self.preview_summary {
+                                return Ok(Some(AgentEvent::ThinkingDelta {
+                                    delta: fragment.into(),
+                                }));
+                            }
+                        }
                         "signature" => signature.push_str(fragment),
                         _ => return Err(invalid("unsupported Bedrock reasoning fragment")),
                     }

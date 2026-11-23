@@ -111,14 +111,17 @@ fn build_with_connection(
             let region = std::env::var("AWS_REGION").map_err(|_| {
                 ProviderError::InvalidResponse("Bedrock requires AWS_REGION".into())
             })?;
-            Ok(Arc::new(crate::bedrock_provider::BedrockProvider::new(
-                &config.provider,
-                &config.model,
-                region,
-                output_limit,
-                !replay_disabled && !reasoning_disabled,
-                timeout,
-            )?))
+            Ok(Arc::new(
+                crate::bedrock_provider::BedrockProvider::new(
+                    &config.provider,
+                    &config.model,
+                    region,
+                    output_limit,
+                    !replay_disabled && !reasoning_disabled,
+                    timeout,
+                )?
+                .with_reasoning(reasoning)?,
+            ))
         }
         ProviderProtocol::AzureOpenAI => {
             if original_endpoint.is_some() {
