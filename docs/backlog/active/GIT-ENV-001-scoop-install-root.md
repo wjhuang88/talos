@@ -12,7 +12,7 @@ Status: Active / Claimed proposed, effective only on main. Source Issue: [#1004]
 | Work Slice | GIT-ENV-001 Windows Scoop installation-root admission for prepared Checkout and Commit under ADR-089, including native execution and refusal evidence. I324 owns unsupported host queries. |
 | Claimed At | 2026-11-23 |
 | Source Issue | #1004 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #1006 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested dedicated handling. Independent approval and CI required before main activation. |
 | Implementation PR | Pending effective main claim |
