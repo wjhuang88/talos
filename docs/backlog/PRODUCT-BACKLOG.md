@@ -1,3 +1,7 @@
+## GIT-ENV-001 / #1004 — Scoop Git environment admission
+
+Intake / Unclaimed. [Story, acceptance and required reads](active/GIT-ENV-001-scoop-install-root.md).
+
 ## SEARCH-001-D3-T5 / I335 / #1001 — proposed bounded real Bing transport
 
 [Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): Active / Claimed PROPOSED through governance #1002; technical source implementation first, explicit opt-in only after claim merge, no default/public Bing WWW activation; #1000 supplier/LLM output rights remain separate and unproven, #957 T3b Blocked / Unclaimed.

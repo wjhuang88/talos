@@ -235,25 +235,25 @@ class ClassifierTests(unittest.TestCase):
 
             executable = repo / "docs" / "executable.md"
             executable.write_text("#!/bin/sh\n", encoding="utf-8")
-            executable.chmod(0o755)
-            git("add", ".")
+            git("add", "--chmod=+x", "docs/executable.md")
             git("commit", "--quiet", "-m", "executable markdown")
             executable_head = git("rev-parse", "HEAD")
             self.assertTrue(
                 MODULE.classify_repository(repo, binary_head, executable_head).full_validation
             )
 
-            symlink = repo / "docs" / "symlink.md"
-            symlink.symlink_to("baseline.md")
-            git("add", ".")
+            # Construct the committed link without requiring host symlink privileges.
+            link_blob = subprocess.check_output(
+                ["git", "-C", str(repo), "hash-object", "-w", "--stdin"], input=b"baseline.md"
+            ).decode().strip()
+            git("update-index", "--add", "--cacheinfo", f"120000,{link_blob},docs/symlink.md")
             git("commit", "--quiet", "-m", "symlink markdown")
             symlink_head = git("rev-parse", "HEAD")
             self.assertTrue(
                 MODULE.classify_repository(repo, executable_head, symlink_head).full_validation
             )
 
-            executable.chmod(0o644)
-            git("add", ".")
+            git("update-index", "--chmod=-x", "docs/executable.md")
             git("commit", "--quiet", "-m", "remove executable bit")
             mode_removal_head = git("rev-parse", "HEAD")
             self.assertTrue(
