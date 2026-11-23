@@ -297,7 +297,7 @@ pub(super) fn select_captured_target_filter(
                 source.as_str().into(),
                 Some(std::path::Path::new("")),
                 &mut metadata,
-                source == ".gitattributes",
+                source.as_str() == ".gitattributes",
             )
             .map_err(|_| {
                 GitToolError::InvalidInput("Target attribute interpretation failed".into())
