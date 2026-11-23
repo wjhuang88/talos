@@ -1,6 +1,25 @@
 # GIT-ENV-001 — Scoop installation environment and prepared Git writes
 
-Status: Intake / Unclaimed. Source Issue: [#1004](https://github.com/wjhuang88/talos/issues/1004).
+Status: Active / Claimed proposed, effective only on main. Source Issue: [#1004](https://github.com/wjhuang88/talos/issues/1004).
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6.2 Astra |
+| Work Slice | GIT-ENV-001 Windows Scoop installation-root admission for prepared Checkout and Commit under ADR-089, including native execution and refusal evidence. I324 owns unsupported host queries. |
+| Claimed At | 2026-11-23 |
+| Source Issue | #1004 |
+| Governance Claim PR | #1006 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer requested dedicated handling. Independent approval and CI required before main activation. |
+| Implementation PR | Pending effective main claim |
+| Last Updated | 2026-11-23 |
+| Handoff / Release Condition | Reviewed permission decision, native default Scoop approval/denial/stale tests and implementation merge evidence. |
+
+The installed Scoop shim points to the underlying installation's cmd/git.exe. Discovery and revalidation both call validate_environment in prepared_add.rs. Review both call sites and executable identity handling together. The global environment-variable value alone cannot establish executable identity.
 
 Scoop sets `GIT_INSTALL_ROOT` to the installation directory. With default Windows settings the prepared writer currently rejects the environment before Checkout can be approved. Users need approved operations to work while keeping repository, index, attributes, helpers and executable identity bound to the prepared plan.
 
