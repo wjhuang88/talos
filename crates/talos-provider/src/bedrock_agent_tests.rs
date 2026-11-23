@@ -544,3 +544,22 @@ async fn sonnet_budget_and_live_summary_follow_configured_wire() {
     assert!(ended);
     mock.assert_async().await;
 }
+
+#[test]
+fn bedrock_rejects_unrepresentable_timeout_before_dispatch() {
+    let timeout = talos_config::ProviderTimeoutConfig {
+        dispatch_timeout_secs: u64::MAX,
+        ..Default::default()
+    };
+    assert!(
+        crate::bedrock_provider::BedrockProvider::new(
+            "p",
+            "m",
+            "us-east-1".into(),
+            None,
+            true,
+            timeout
+        )
+        .is_err()
+    );
+}

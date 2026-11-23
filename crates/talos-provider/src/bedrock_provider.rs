@@ -40,6 +40,13 @@ impl BedrockProvider {
         allow_replay: bool,
         timeout: ProviderTimeoutConfig,
     ) -> ProviderResult<Self> {
+        for seconds in [
+            timeout.dispatch_timeout_secs,
+            timeout.first_packet_timeout_secs,
+            timeout.stream_idle_timeout_secs,
+        ] {
+            deadline_after(tokio::time::Instant::now(), seconds)?;
+        }
         bedrock_endpoint::converse_stream(&region, model)
             .map_err(|e| ProviderError::InvalidResponse(e.into()))?;
         Ok(Self {
@@ -257,8 +264,10 @@ impl BedrockProvider {
         let preview_summary = self.budget.is_some();
         let payload = serde_json::to_vec(&body)
             .map_err(|_| ProviderError::InvalidResponse("invalid Bedrock request body".into()))?;
-        let deadline =
-            tokio::time::Instant::now() + Duration::from_secs(self.timeout.dispatch_timeout_secs);
+        let deadline = deadline_after(
+            tokio::time::Instant::now(),
+            self.timeout.dispatch_timeout_secs,
+        )?;
         let deadline = expires.map_or(deadline, |t| deadline.min(t.into()));
         let max_attempts = self.timeout.max_attempts;
         let mut attempt = 0;
@@ -332,7 +341,7 @@ impl BedrockProvider {
                 max_attempts,
             });
         }
-        let first = (started + Duration::from_secs(self.timeout.first_packet_timeout_secs))
+        let first = deadline_after(started, self.timeout.first_packet_timeout_secs)?
             .saturating_duration_since(tokio::time::Instant::now());
         let idle = Duration::from_secs(self.timeout.stream_idle_timeout_secs);
         tokio::spawn(async move {
@@ -372,6 +381,15 @@ impl BedrockProvider {
         });
         Ok(())
     }
+}
+
+fn deadline_after(
+    start: tokio::time::Instant,
+    seconds: u64,
+) -> ProviderResult<tokio::time::Instant> {
+    start
+        .checked_add(Duration::from_secs(seconds))
+        .ok_or_else(|| ProviderError::InvalidResponse("Bedrock timeout exceeds clock range".into()))
 }
 
 enum Sink {
