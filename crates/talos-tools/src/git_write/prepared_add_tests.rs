@@ -233,4 +233,56 @@ fn integration_git(root: &Path, args: &[&str]) -> String {
         .to_owned()
 }
 
+// I324: native Git 2.36 rejects six query forms, but that observation does
+// NOT authorize relaxing inherited GIT_* env rules. The original Windows
+// Scoop reproduction has GIT_INSTALL_ROOT set and must still fail closed
+// until a *separate* precise environment-effect decision is accepted.
+#[test]
+fn i324_scoop_install_root_and_other_git_overrides_still_require_separate_authority() {
+    let mut allowed = BTreeMap::<OsString, OsString>::new();
+    allowed.insert(OsString::from("GIT_PAGER"), OsString::from("cat"));
+    allowed.insert(OsString::from("HOME"), OsString::from("i324-fixture-home"));
+    assert!(
+        validate_environment(&allowed).is_ok(),
+        "existing no-pager exception and ordinary home evidence remain accepted"
+    );
+
+    for rejected in [
+        "GIT_INSTALL_ROOT",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_ATTR_SYSTEM",
+        "GIT_ATTR_GLOBAL",
+        "GIT_SHELL_PATH",
+        "GIT_INDEX_FILE",
+        "GIT_TRACE",
+    ] {
+        let mut frozen = allowed.clone();
+        frozen.insert(OsString::from(rejected), OsString::from("i324-test-only"));
+        assert!(
+            matches!(
+                validate_environment(&frozen),
+                Err(GitToolError::InvalidInput(_))
+            ),
+            "inherited {rejected} cannot silently gain Git authority"
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        let mut frozen = allowed;
+        frozen.insert(
+            OsString::from("git_install_root"),
+            OsString::from("i324-test-only"),
+        );
+        assert!(
+            matches!(
+                validate_environment(&frozen),
+                Err(GitToolError::InvalidInput(_))
+            ),
+            "Windows environment names are case-insensitive"
+        );
+    }
+}
+
 include!("prepared_add_tests/command_evidence.rs");
