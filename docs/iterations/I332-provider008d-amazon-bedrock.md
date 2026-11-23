@@ -36,3 +36,32 @@ Deliver a stateless Bedrock tool round with ordered images, reasoning where supp
 I323 closed via #984. Implementation starts after this atomic claim and activation reach main.
 
 I141 and I150 are Complete. At main 21589346, I330 has merged its separate host-binding implementation #979. No Bedrock code is in that slice.
+
+At development head `567a6267`, the locked Bedrock provider filter passed
+13 tests, including cancellation during a partial HTTP frame. The standard
+local preflight passed governance and workspace check, then stopped at
+workspace Clippy on three unwrap_used findings in the frame and response
+readers. Workspace tests and SDK fixture checks were not reached by that run.
+
+The next preflight retry passed workspace Clippy and reached workspace tests.
+The talos-agent library reported 768 passes and one git_auto failure: the Git
+maintenance executable path differed from the bound executable. Running that
+same test binary with /usr/local/libexec/git-core first on PATH passed the
+isolated case (Git 2.56.1). The complete preflight still requires a fresh run.
+
+Mid-implementation Agent review of 82b66ae7 found that textual projection hid
+orphan tool results from validation and that fresh CLI catalog selection could
+prompt for an unrelated API key. The first correction is dbed0dcb; 14 Bedrock
+provider tests passed, including both textual protocols rejecting orphan results.
+
+At f4c14075 the fresh Bedrock CLI catalog selection regression passed. Standard
+preflight stopped in Clippy at the nested unmatched-result check in
+bedrock_request.rs (collapsible_match) before workspace tests.
+
+Subsequent local preflight attempts stopped at the talos-mcp git_prepared
+case04 Unix socket fixture with PermissionDenied. These attempts did not
+establish a passing full preflight. During signed continuation development,
+the first focused builds caught a digest formatting error and a fixture API
+argument mismatch. After correction, all 15 locked Bedrock library tests
+passed, including signed ordinary tool continuation in Native, Compat and
+TalosStrict against local HTTP.

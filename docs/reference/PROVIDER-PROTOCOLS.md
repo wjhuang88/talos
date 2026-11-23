@@ -336,3 +336,66 @@ provider configuration, confirmed catalog evidence or the conservative default. 
 profile selection only: the browser does not read the token or verify authentication. Missing
 or invalid tokens still fail at request dispatch. Conflicting provider/model endpoint overrides
 are invalid profiles and must be removed instead of relocating the profile credential.
+
+## Amazon Bedrock ConverseStream
+
+On the I332 development branch, select a model or inference profile that supports
+ConverseStream in your chosen region. Replace the placeholder with its Bedrock ID.
+
+```toml
+provider = "regional"
+model = "<bedrock-model-or-inference-profile-id>"
+
+[providers.regional]
+protocol = "amazon-bedrock"
+```
+
+Set `AWS_REGION` before constructing the provider. At dispatch, Talos reads
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Temporary credentials also
+require their matching `AWS_SESSION_TOKEN`. Supply these through the process
+environment. Talos builds the regional Bedrock Runtime URL, signs the serialized
+request with SigV4 and disables redirects. Omit provider and model `base_url`
+overrides for this protocol.
+
+Native tool requests use Converse tool specifications. Compat and TalosStrict
+use textual calls over the same signed transport. Tool execution follows the
+Agent permission policy. The adapter drains trailing usage and checks for stream
+errors before delivering calls. Controlled local HTTP tests exercise all three
+modes with ordered PNGs and a file-read round trip. On the Agent replay path,
+signed reasoning stays in private session memory. The next request restores the
+original assistant blocks only when the public message, preceding wire messages,
+system instructions, provider, region, model and tool protocol match. Reopening
+durable history without that private attachment refuses continuation. Legacy
+event-only SDK streams report an error on signed reasoning.
+
+### Frozen Bedrock catalog evidence
+
+The packaged models.toml (Git blob `72d28dafde10a7940b4d6cbc1e488a9cca1ab0d6`)
+contains 122 amazon-bedrock rows. Three exact IDs in that snapshot appear in
+AWS's Nova v1 ConverseStream table: `amazon.nova-micro-v1:0`,
+`amazon.nova-lite-v1:0` and `amazon.nova-pro-v1:0`. The documented Premier
+base ID is absent. These matches establish API support only. Region availability,
+inference-profile routing and account access require separate verification.
+The other 119 rows have no admission from this table, including prefixed IDs.
+See [AWS Nova v1 Converse API](https://docs.aws.amazon.com/nova/latest/userguide/using-converse-api.html).
+
+For those three exact IDs, a configured `[providers.amazon-bedrock]` table
+with no model or provider endpoint override allows catalog protocol inference.
+Explicit model and provider protocols take precedence. Inference reads no
+credentials and uses the same regional destination as explicit configuration.
+
+The Bedrock Agent tests cover ordinary registered tools and conversation images.
+Request-local PNGs use the ADR-051 size limits and the producer's original
+expiry. Dispatch and pre-stream retries share the earliest expiry and dispatch
+deadline. A signed turn that depended on a temporary image can only continue if
+its exact wire prefix can be restored. Protected browser tool plans still fail
+before dispatch.
+
+For the explicit model ID `us.anthropic.claude-sonnet-4-20250514-v1:0`,
+a model reasoning budget of at least 1024 and below the output token limit
+enables extended thinking with replay. Talos sends the budget in
+`additionalModelRequestFields.thinking` and streams the returned summary as
+live thinking deltas. The signature stays in private custody. Other routes
+reject explicit budgets, and effort levels are unsupported. The AWS sample
+uses this exact profile in its request.
+[AWS ConverseStream reasoning example](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-runtime_example_bedrock-runtime_ConverseStream_AnthropicClaudeReasoning_section.html)

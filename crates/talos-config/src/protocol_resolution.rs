@@ -142,6 +142,16 @@ pub(crate) fn resolve_model_provider_protocol(
         && crate::catalog_protocol::has_unoverridden_model(provider, model);
     let catalog_model = if crate::azure_catalog::reviewed(config, provider, model) {
         Some(ProviderProtocol::AzureOpenAI)
+    } else if provider == "amazon-bedrock"
+        && config.providers.contains_key(provider)
+        && endpoint.is_none()
+        && matches!(
+            model,
+            "amazon.nova-micro-v1:0" | "amazon.nova-lite-v1:0" | "amazon.nova-pro-v1:0"
+        )
+        && crate::catalog_protocol::has_unoverridden_model(provider, model)
+    {
+        Some(ProviderProtocol::AmazonBedrock)
     } else if reviewed {
         Some(ProviderProtocol::GoogleGemini)
     } else {
@@ -353,6 +363,44 @@ mod tests {
             model: model.into(),
             ..Config::default()
         }
+    }
+
+    #[test]
+    fn bedrock_catalog_admits_only_reviewed_ids_and_preserves_overrides() {
+        let provider = "amazon-bedrock";
+        let model = "amazon.nova-lite-v1:0";
+        let mut config = config_with_provider(provider, model);
+        config
+            .providers
+            .insert(provider.into(), ProviderConfig::default());
+        for id in ["amazon.nova-micro-v1:0", model, "amazon.nova-pro-v1:0"] {
+            let resolved = config.resolve_model_protocol(provider, id);
+            assert_eq!(resolved.protocol, ProviderProtocol::AmazonBedrock);
+            assert_eq!(resolved.source, ProtocolResolutionSource::CatalogInferred);
+        }
+        for (name, id) in [(provider, "us.amazon.nova-lite-v1:0"), ("gateway", model)] {
+            assert_ne!(
+                config.resolve_model_protocol(name, id).protocol,
+                ProviderProtocol::AmazonBedrock
+            );
+        }
+        config.providers.insert(
+            provider.into(),
+            ProviderConfig {
+                base_url: Some("https://gateway.example/v1".into()),
+                ..Default::default()
+            },
+        );
+        assert_ne!(
+            config.resolve_model_protocol(provider, model).protocol,
+            ProviderProtocol::AmazonBedrock
+        );
+        let profile = config.providers.get_mut(provider).unwrap();
+        profile.base_url = None;
+        profile.protocol = ProviderProtocol::OpenAIChat;
+        let resolved = config.resolve_model_protocol(provider, model);
+        assert_eq!(resolved.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(resolved.source, ProtocolResolutionSource::Configured);
     }
 
     #[test]
