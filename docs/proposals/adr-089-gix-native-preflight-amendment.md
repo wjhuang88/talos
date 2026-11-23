@@ -1,5 +1,6 @@
 # ADR-089 限定修订提案：旧版 Git 不支持的预检动作兼容替换
 
+> **2026-11-23 publication boundary: non-binding Proposed documentation ONLY.** Merging this document under single-maintainer rules does not accept ADR-089 authority changes, enable any new runtime permission, or satisfy independent Git security/API review for a later security-policy amendment. The accepted ADR remains unchanged.
 > 2026-11-19 维护者范围修正。**Status: Proposed — NOT Accepted / NOT implementation authority.**
 > Source: [Issue #919](https://github.com/wjhuang88/talos/issues/919); decision text in [ADR-089](../decisions/089-structured-git-effect-authorization.md).
 > 本修订**取代** 2026-11-12 的“所有预检都必须 gix 化、彻底禁止 CLI”方案，不修改已经生效的 ADR 条款。
@@ -33,7 +34,7 @@
 1. 按命令逐项确认旧版失败，而非按整个预检阶段假定不能运行 CLI；记录 native Git 2.36.1 和新版 Git exit code/stdout/stderr。
 2. 对**新增替代路径**验证没有未经授权的外部进程、隐式 I/O、权限扩张和源遗漏；不要求保留的合法 CLI 零调用。
 3. 比较属性根和过滤器预测，覆盖缺失变出现、配置/可执行文件替换、Unicode/空格、不同安装和 17 MiB Checkout/Commit。
-4. **D1 — 架构 ADR 接受**：独立 Git 权限/安全/API 审查通过、维护者针对精确文本另行明确最终接受、ADR 精确提交 CI 与治理检查完成后，才可合并 #931 作为**架构约束决策**。此前保持 Proposed / NOT ACCEPTED。原则同意继续开发不等于最终接受；仓库的强制独立安全审查不允许以单维护者豁免。
+4. **D1 — 架构设计提案与受保护的权限决策分离**：本 #931 只合并 **Proposed / NOT Accepted** 的非生效设计资料，且不修改 Accepted ADR-089。未来任何真正涉及 Path/Command/Remote 等权限边界的 ADR 修订，仍须独立 Git 权限/安全/API 审查、维护者对其精确文本正式接受、精确提交 CI 与治理检查。单维护者流程不能代替受保护安全审查。
 5. **D2 — 生产实现验收**：针对每一条替代路径证明选定 writer 的真实来源、精确授权的配置/属性/树对象与祖先 Read、缺失源证据、无隐藏子进程、失效重验和权限效果；原始 Scoop 环境的 Git 2.36.1 与新版 Git 17 MiB Prepared Checkout/Commit、拒绝/过期测试和实施 PR 精确提交 CI 均完成，且获得必要独立审查与最终合并授权后才允许生产启用和关闭 #919。**D2 不是纯架构 ADR 在 D1 阶段的循环先决条件，D1 也不会自动授予任何运行时新权限。**
 
 这是**重新界定的安全决策申请**，不是允许全面替换旧的 Git CLI 探测，也不是已经完成的 Git 2.36 兼容性结果。

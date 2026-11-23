@@ -1,5 +1,6 @@
 # 使用 gix 对旧版 Git 不支持的预检动作进行局部兼容
 
+> **2026-11-23 publication boundary: non-binding Proposed documentation ONLY.** Single-maintainer merge records the architecture for further development without accepting any new security/permission authority; any actual ADR-089 authority amendment requires a separate independent security/API review and explicit maintainer acceptance.
 > 当前范围：2026-11-19 维护者更正，覆盖 2026-11-12“完全替换 Git CLI 前置分析”的旧意见。
 > 来源：[Issue #919](https://github.com/wjhuang88/talos/issues/919)、[ADR-089 限定修订提案](adr-089-gix-native-preflight-amendment.md)。
 > **Status: Proposed / not implementation authority.** 本方案保留实际系统 Git 写入与原有权限安全模型。
@@ -43,7 +44,7 @@
 - **D1 设计决策 / ADR 合并**：先由独立 Git 权限/安全/API 审查者核验精确的局部兼容替换边界和拒绝语义，再由维护者对**精确修订文本正式接受**；同时要求 ADR PR 精确 HEAD CI、两项治理检查及合并前 CAS。此时允许合入**仅规定约束、不实际授予生产新权限**的 ADR；原则批准开发或 CI 通过都不能替代独立审查。
 - **D2 生产实现 / #919 完成**：必须在替代路径实际接入之前独立审查其权限载体和具体来源，证明选定 system Git 编译默认路径/属性来源、每次精确 Read/metadata 与对象授权、缺失来源、失效重验、实际 hooks/filters/receiver 效果和无隐藏子进程，并获得原始环境 Git 2.36.1 与新版 Git 17 MiB Checkout/Commit 原生验收及实施 HEAD CI。没有这些证据不得合并生产开关或宣称兼容性。**D2 不作为 D1 的循环依赖，D1 通过也不代表 D2 已获批准。**
 
-当前 ADR 仍 **Proposed / NOT ACCEPTED**；#931 不得以单维护者免审方式跳过安全 review，#928 与 #919 的原生验收和生产交付仍独立开放。
+当前局部兼容设计仍为 **Proposed / NOT ACCEPTED**；此 #931 仅合并不具有授权效力的提案文档，**不得**视为权限安全审查通过或正式 ADR 接受。未来受保护的 ADR/权限变更仍必须独立安全审查；#928 与 #919 的原生验收和生产交付继续开放。
 
 ## 历史范围说明
 
