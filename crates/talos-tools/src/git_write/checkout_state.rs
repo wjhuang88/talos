@@ -265,7 +265,13 @@ pub(super) fn select_captured_target_filter(
 
     let mut search = gix_attributes::Search::default();
     let mut metadata = gix_attributes::search::MetadataCollection::default();
-    for (source, bytes) in &target.attributes {
+    // Git's attribute precedence follows the target path's ancestors,
+    // not BTreeMap's lexical order. In particular "!nested/" sorts
+    // ahead of the root ".gitattributes"; gix traverses loaded lists in
+    // reverse, so add ancestors before more-specific nested sources.
+    let mut ordered_sources = target.attributes.iter().collect::<Vec<_>>();
+    ordered_sources.sort_by_key(|(source, _)| source.bytes().filter(|byte| *byte == b'/').count());
+    for (source, bytes) in ordered_sources {
         let valid_source = source == ".gitattributes"
             || source
                 .strip_suffix("/.gitattributes")
@@ -291,7 +297,7 @@ pub(super) fn select_captured_target_filter(
                 source.as_str().into(),
                 Some(std::path::Path::new("")),
                 &mut metadata,
-                true,
+                source == ".gitattributes",
             )
             .map_err(|_| {
                 GitToolError::InvalidInput("Target attribute interpretation failed".into())
