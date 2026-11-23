@@ -1,0 +1,114 @@
+   Compiling windows-sys v0.61.2
+   Compiling talos-tools v0.10.1 (E:\AiProjects\talos\crates\talos-tools)
+   Compiling mio v1.2.1
+   Compiling socket2 v0.6.4
+   Compiling winapi-util v0.1.11
+   Compiling schannel v0.1.29
+   Compiling wasmtime-internal-jit-icache-coherence v48.0.1
+   Compiling tempfile v3.27.0
+   Compiling termcolor v1.4.1
+   Compiling same-file v1.0.6
+   Compiling walkdir v2.5.0
+   Compiling rustls-native-certs v0.8.4
+   Compiling wasmprinter v0.254.0
+   Compiling ignore v0.4.33
+   Compiling tokio v1.53.1
+   Compiling wasmtime-environ v48.0.1
+   Compiling talos-core v0.10.1 (E:\AiProjects\talos\crates\talos-core)
+   Compiling hyper v1.10.1
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.4
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.20
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling talos-permission v0.10.1 (E:\AiProjects\talos\crates\talos-permission)
+   Compiling talos-sandbox v0.10.1 (E:\AiProjects\talos\crates\talos-sandbox)
+   Compiling wasmtime-internal-unwinder v48.0.1
+   Compiling wasmtime-internal-cranelift v48.0.1
+   Compiling wasmtime v48.0.1
+   Compiling talos-text v0.10.1 (E:\AiProjects\talos\crates\talos-text)
+   Compiling talos-plugin v0.10.1 (E:\AiProjects\talos\crates\talos-plugin)
+warning: variable does not need to be mutable
+   --> crates\talos-tools\src\bash_tool.rs:527:13
+    |
+527 |         let mut configuration = serde_json::json!({
+    |             ----^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\talos-tools\src\bash_tool.rs:597:17
+    |
+597 |             let mut profile = vec![foreground];
+    |                 ----^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: `talos-tools` (lib test) generated 2 warnings (run `cargo fix --lib -p talos-tools --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.61s
+     Running unittests src\lib.rs (target\debug\deps\talos_tools-7ba2d585dbd93c41.exe)
+
+running 58 tests
+test process_boundary::handle_snapshot::two_release_errors_are_retained_in_order_without_retry ... ok
+test process_boundary::handle_snapshot::metadata_predicates_reject_without_dereferencing_fabricated_addresses ... ok
+test process_boundary::windows_command_line::tests::preserves_unpaired_utf16_without_replacement ... ok
+test process_boundary::resource_acceptance::termination_requires_real_success_and_signalled_wait_and_rejects_second_call ... ok
+test process_boundary::windows_command_line::tests::quoting_handles_empty_quotes_and_trailing_backslashes ... ok
+test process_boundary::windows_cwd::tests::normalization_sensitive_verbatim_directory_is_preserved ... ok
+test process_boundary::windows_environment::tests::empty_and_nonempty_blocks_have_double_nul_terminators ... ok
+test process_boundary::resource_acceptance::actual_result_predicates_fail_closed_and_never_retry_release ... ok
+test process_boundary::windows_environment::tests::preserves_raw_utf16_and_drive_current_directory ... ok
+test process_boundary::windows_environment::tests::explicit_snapshot_overrides_case_equivalent_keys_and_preserves_nonunicode ... ok
+test process_boundary::windows_environment::tests::invalid_entries_fail_without_returning_a_partial_block ... ok
+test process_boundary::handle_snapshot::unknown_type_is_not_replaced_with_an_inferred_type ... ok
+test process_boundary::windows_cwd::tests::canonical_drive_directory_retains_target_without_verbatim_prefix ... ok
+test process_boundary::windows_foreground::tests::dropped_reservation_is_sticky_but_other_operations_are_isolated ... ok
+test process_boundary::handle_snapshot::evidence_caps_fail_instead_of_reporting_partial_success ... ok
+test process_boundary::native_inventory::reviewed_native_sites_and_instrumentation_are_unchanged ... ok
+test process_boundary::windows_foreground::tests::memory_allocation_probe_child ... ok
+test process_boundary::windows_command_line::tests::rejects_nul_and_enforces_limit_including_terminator ... ok
+test process_boundary::windows_foreground::tests::ordinary_io_error_has_completed_resource_ownership ... ok
+test process_boundary::windows_foreground::tests::panicked_io_worker_never_confirms_cleanup ... ok
+test process_boundary::windows_launch_command_tests::finite_input_pipe_delivers_bytes_then_eof_and_inherits_only_reader ... ok
+test process_boundary::windows_launch_command_tests::job_cleanup_confirms_empty_job_and_rejects_invalid_handle ... ok
+test process_boundary::windows_foreground::tests::foreground_launch_observes_pre_cancel_closed_sender_and_expired_deadline ... ok
+test process_boundary::native_inventory::checkout_crlf_preserves_reviewed_native_inventory ... ok
+test process_boundary::windows_launch_command_tests::native_launch_inputs_preserve_raw_arguments_and_frozen_environment ... ok
+test process_boundary::windows_launch_command_tests::no_input_launch_owns_inheritable_nul_with_immediate_eof ... ok
+test process_boundary::windows_foreground::tests::background_memory_override_denies_real_allocation ... ok
+test process_boundary::native_inventory::inventory_rejects_uncovered_calls_and_removed_or_moved_observation ... ok
+test process_boundary::windows_foreground::tests::job_memory_policy_denies_real_allocation ... ok
+test process_boundary::windows_launch_command_tests::job_cleanup_confirms_live_process_exit_before_returning ... ok
+test process_boundary::windows_foreground::tests::launch_checkpoints_refuse_before_payload_can_run ... ok
+test process_boundary::windows_tests::handle_receipt_failures_are_results_not_early_panics ... ok
+test process_boundary::windows_tests::call_receipt_requires_complete_matching_checkpoints ... ok
+test process_boundary::windows_tests::handle_stage_receipt_requires_exact_phase_order ... ok
+test process_boundary::windows_foreground::tests::foreground_timeout_confirms_job_and_io_cleanup ... ok
+test process_boundary::windows_tests::windows_environment_filters_dangerous_names_case_insensitively ... ok
+test process_boundary::windows_tests::known_resource_receipts_require_actual_complete_summary_and_negatives ... ok
+test process_boundary::windows_foreground::tests::typed_start_evidence_preserves_preflight_refusal_and_started_timeout ... ok
+test process_boundary::windows_tests::windows_job_rejects_invalid_working_directory_without_spawning ... ok
+test process_boundary::windows_tests::direct_lifecycle_receipt_preserves_growth_as_evidence ... ok
+test process_boundary::windows_tests::windows_assignment_failure_cleans_suspended_process_without_running_marker ... ok
+test process_boundary::windows_tests::windows_resume_failure_cleans_assigned_process_and_handles ... ok
+test process_boundary::windows_tests::windows_unsupported_job_host_is_rejected_fail_closed ... ok
+test process_boundary::windows_tests::windows_job_termination_reaches_terminal_event ... ok
+test process_boundary::windows_launch_command_tests::no_input_child_observes_eof ... ok
+test process_boundary::windows_foreground::tests::dropped_foreground_wait_keeps_cleanup_owned ... ok
+test process_boundary::windows_foreground::tests::foreground_finite_binary_input_reaches_eof_and_returns_exact_output ... ok
+test process_boundary::windows_foreground::tests::foreground_output_limit_terminates_writer_and_confirms_cleanup ... ok
+test process_boundary::windows_tests::windows_job_captures_output_and_reaps_process ... ok
+test process_boundary::windows_tests::windows_child_runs_only_after_job_assignment_and_resume ... ok
+test process_boundary::windows_foreground::tests::foreground_large_input_drains_both_output_pipes_concurrently ... ok
+test process_boundary::windows_foreground::tests::cancelling_one_foreground_operation_preserves_another_live_job ... ok
+test process_boundary::windows_tests::windows_concurrent_spawn_excludes_unrelated_inheritable_handle ... ok
+test process_boundary::windows_tests::windows_partial_setup_failures_release_every_parent_handle ... ok
+test process_boundary::windows_tests::windows_job_termination_reaps_a_powershell_grandchild ... ok
+test process_boundary::windows_foreground::tests::foreground_leader_exit_reaps_descendant_with_redirected_stdio ... ok
+test process_boundary::windows_tests::windows_job_preserves_descendant_output_after_leader_exit ... ok
+test process_boundary::windows_foreground::tests::tool_memory_adapter_preserves_truncation_and_timeout_output ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 5.54s

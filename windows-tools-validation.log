@@ -1,0 +1,875 @@
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 45s
+     Running unittests src\lib.rs (target\debug\deps\talos_tools-20219850759a1fcc.exe)
+
+running 372 tests
+test diff_stat::diff_tool_tests::test_diff_is_read_only ... ok
+test diff_stat::stat_tool_tests::test_stat_is_read_only ... ok
+test diff_stat::diff_tool_tests::test_diff_file_not_found ... ok
+test diff_stat::stat_tool_tests::test_stat_file ... ok
+test diff_stat::stat_tool_tests::test_stat_not_found ... ok
+test diff_stat::stat_tool_tests::test_stat_directory ... ok
+test diff_stat::diff_tool_tests::test_diff_identical_files ... ok
+test git::git_write::config_state::tests::checkout_protected_paths_overlap_across_windows_prefix_spellings ... ok
+test git::git_write::config_state::tests::checkout_reload_refuses_target_promisor_and_uses_final_comparison_value ... ok
+test git::git_write::auxiliary_paths::tests::continuation_refuses_replaced_prior_source_before_extending ... ok
+test git::git_write::auxiliary_paths::tests::shared_ancestor_evidence_rejects_replacement_during_extension ... ok
+test git::git_write::config_state::tests::child_promisor_configuration_refuses_object_inspection ... ok
+test diff_stat::diff_tool_tests::test_diff_shows_changes ... ok
+test git::git_write::config_state::tests::child_configuration_rejects_new_origins_before_source_capture ... ok
+test git::git_write::config_state::tests::child_excludes_follow_child_config_and_frozen_environment ... ok
+test git::git_write::config_state::tests::declared_home_include_paths_reject_ambiguous_interpolation ... ok
+test git::git_write::config_state::tests::declared_relative_include_retains_cancelled_ancestor_on_canonical_root ... ok
+test git::git_write::config_state::tests::declared_windows_include_paths_preserve_roots_and_reject_ambiguous_forms ... ok
+test git::git_write::config_state::tests::filter_attribute_sentinels_reject_literal_driver_commands ... ok
+test git::git_write::config_state::tests::git_boolean_matches_git_disabled_spellings ... ok
+test git::git_write::config_state::tests::host_parser_preserves_duplicate_order_implicit_empty_and_subsection_case ... ok
+test git::git_write::config_state::tests::host_parser_preserves_non_utf8_configuration_bytes ... ok
+test git::git_write::config_state::tests::include_traversal_preserves_spelling_without_relaxing_other_paths ... ok
+test git::git_write::auxiliary_paths::tests::resolution_requires_capability_before_traversal_and_target_read_before_content ... ok
+test git::git_write::config_state::tests::path_interpolation_uses_only_the_frozen_environment ... ok
+test git::git_write::config_state::tests::push_recursion_uses_cross_key_declaration_order ... ok
+test git::git_write::config_state::tests::child_startup_layout_retains_raw_target_hidden_by_include ... ok
+test git::git_write::checkout_deletion::tests::checkout_deletion_requires_child_admission_and_detects_late_changes ... ok
+test git::git_write::config_state::tests::receiver_capture_rejects_relative_origin_before_snapshot ... ok
+test git::git_write::auxiliary_paths::tests::continuation_keeps_budget_and_requires_new_target_read ... ok
+test git::git_write::config_state::tests::windows_auxiliary_parent_at_volume_root_stays_at_root ... ok
+test git::git_write::config_state::tests::receiver_effect_inventory_defers_reads_and_rejects_unbound_commands ... ok
+test git::git_write::host_boundary_tests::output_boundary_accepts_exact_limit_and_rejects_excess ... ok
+test git::git_write::host_boundary_tests::real_host_output_limit_reports_ambiguous_effects ... ok
+test git::git_write::config_state::tests::checkout_hooks_are_deferred_and_recursive_effects_are_explicit ... ok
+test git::git_write::config_state::tests::auxiliary_evidence_cannot_be_reused_for_a_changed_source_set ... ok
+test git::git_write::config_state::tests::checkout_reload_hook_inventory_preserves_source_cache_and_defers_reads ... ok
+test git::git_write::config_state::tests::configuration_verification_rejects_cross_key_reordering ... ok
+test git::git_write::config_state::tests::auxiliary_capture_resolves_cancelled_parent_without_losing_evidence_key ... ok
+test git::git_write::positional_argument_tests::ordinary_remote_and_refspec_values_remain_valid ... ok
+test git::git_write::prepared_add::command::tests::frozen_values_survive_source_changes ... ok
+test git::git_write::config_state::tests::auxiliary_evidence_rejects_same_content_replacement_and_missing_creation ... ok
+test git::git_write::positional_argument_tests::options_are_rejected_before_repository_or_host_access ... ok
+test git::git_write::config_state::tests::push_helper_checks_preserve_disabled_settings_and_defer_hook_reads ... ok
+test git::git_write::prepared_add::host_path::tests::receiver_shell_requires_exact_supported_installation ... ok
+test git::git_write::prepared_add::host_path::tests::explicit_git_directory_argument_preserves_canonical_identity ... ok
+test git::git_write::prepared_add::host_path::tests::receiver_program_preserves_identity_and_rejects_unsupported_forms ... ok
+test git::git_write::prepared_add::host_path::tests::explicit_git_directory_arguments_run_native_git ... ok
+test git::git_write::host_boundary_tests::literal_add_does_not_expand_options_or_pathspecs ... FAILED
+test git::git_write::host_boundary_tests::literal_add_resolves_subworkspace_and_preserves_other_index_entries ... FAILED
+test git::git_write::host_boundary_tests::literal_add_supports_directory_deletions_and_contained_absolute_paths ... FAILED
+test git::git_write::checkout_state::tests::local_target_binds_reference_and_detects_movement ... ok
+test git::git_write::checkout_state::tests::target_attributes_come_from_target_tree_not_current_worktree ... ok
+test git::git_write::checkout_state::tests::target_tree_limit_counts_directories_and_rejects_oversized_attributes ... ok
+test git::git_write::prepared_add::tests::approval_is_bound_to_prepared_source_and_index ... ok
+test git::git_write::positional_argument_tests::checkout_previous_branch_shorthand_preserves_branch_switch ... FAILED
+test git::git_write::positional_argument_tests::checkout_preserves_guess_with_negative_fetch_mapping ... FAILED
+test git::git_write::positional_argument_tests::checkout_preserves_unique_remote_tracking_guess ... FAILED
+test git::git_write::positional_argument_tests::checkout_branch_name_never_restores_a_matching_file ... FAILED
+test git::git_write::checkout_deletion::tests::checkout_deletion_enforces_cumulative_bytes_and_entry_limit ... ok
+test git::git_write::config_state::tests::child_startup_layout_matches_native_selection_rules ... ok
+test git::git_write::prepared_add::tests::checkout_created_branch_binds_native_previous_name_expansion ... FAILED
+test git::git_write::prepared_add::tests::checkout_file_directory_transitions_and_conflicting_edits ... FAILED
+test git::git_write::prepared_add::tests::checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head ... FAILED
+test git::git_write::prepared_add::tests::checkout_index_only_filter_refuses_before_mutation ... FAILED
+test git::git_write::prepared_add::tests::checkout_adds_uninitialized_gitlink_and_removes_dirty_initialized_gitlink ... FAILED
+test git::git_write::prepared_add::tests::checkout_guess_binds_remote_and_reference_even_for_equal_commits ... FAILED
+test git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan ... FAILED
+test git::git_write::prepared_add::tests::checkout_protects_captured_target_only_config_from_tree_replacement ... FAILED
+test git::git_write::prepared_add::tests::checkout_same_oid_previous_branch_reflog_change_invalidates_plan ... FAILED
+test git::git_write::prepared_add::tests::checkout_refuses_to_rewrite_effective_configuration_and_attributes ... FAILED
+test git::git_write::prepared_add::tests::checkout_target_configuration_limits_refuse_before_mutation ... FAILED
+test git::git_write::prepared_add::tests::checkout_target_hook_missing_evidence_refuses_later_creation ... FAILED
+test git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree ... FAILED
+test git::git_write::prepared_add::tests::checkout_and_commit_support_tracked_content_over_16_mib ... FAILED
+test git::git_write::prepared_add::tests::checkout_many_nested_directories_share_auxiliary_ancestor_evidence ... FAILED
+test git::git_write::prepared_add::tests::command_budget_reserves_both_pipes_and_never_partially_charges ... ok
+test git::git_write::prepared_add::tests::child_bound_config_discovery_does_not_resolve_configured_worktree ... ok
+test git::git_write::prepared_add::tests::checkout_target_executable_hook_refuses_before_mutation ... FAILED
+test git::git_write::prepared_add::tests::checkout_target_filter_refuses_before_worktree_mutation ... FAILED
+test git::git_write::prepared_add::tests::checkout_target_hooks_wait_for_all_exact_read_tokens ... FAILED
+test git::git_write::prepared_add::tests::child_filter_command_uses_effective_root_without_discovery_prefix ... ok
+test git::git_write::prepared_add::tests::checkout_target_only_configuration_drift_invalidates_retained_plan ... FAILED
+test git::git_write::prepared_add::tests::child_config_discovery_detects_included_fsmonitor_before_status ... FAILED
+test git::git_write::prepared_add::tests::child_invalid_index_is_read_only_after_continuation_admission ... FAILED
+test git::git_write::prepared_add::tests::checkout_tracked_file_to_gitlink_preserves_dirty_source ... FAILED
+test git::git_write::prepared_add::tests::checkout_tracking_prediction_from_detached_head_matches_native ... FAILED
+test git::git_write::prepared_add::tests::directory_rules_include_empty_and_symlink_only_subdirectories ... ok
+test git::git_write::prepared_add::tests::commit_gitlink_preserves_missing_and_uninitialized_checkout_states ... ok
+test git::git_write::prepared_add::tests::checkout_target_tree_cannot_create_or_replace_late_hook ... FAILED
+test git::git_write::prepared_add::tests::checkout_tracking_prediction_matches_native_mode_matrix ... FAILED
+test git::git_write::prepared_add::tests::commit_plan_binds_tracked_sources_and_rejects_add_proof ... ok
+test git::git_write::prepared_add::tests::child_status_filter_is_refused_without_executing_helper ... FAILED
+test git::git_write::prepared_add::tests::commit_gitlink_preparation_defers_child_head_and_worktree_reads ... ok
+test git::git_write::prepared_add::tests::commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_signing ... FAILED
+test git::git_write::prepared_add::tests::commit_inspects_parent_filters_before_mutation_in_both_modes ... FAILED
+test git::git_write::prepared_add::tests::checkout_new_gitlink_preserves_initialized_child ... FAILED
+test git::git_write::prepared_add::tests::commit_refuses_unmerged_index_before_discovery ... ok
+test git::git_write::prepared_add::tests::commit_all_deletes_replaced_tracked_file_and_refuses_nested_repository ... FAILED
+test git::git_write::prepared_add::tests::inherited_git_redirection_is_refused_without_echoing_values ... ok
+test git::git_write::prepared_add::tests::internal_program_validation_distinguishes_unadmitted_path_from_target_drift ... ok
+test git::git_write::prepared_add::tests::direct_and_forged_or_exchanged_proofs_cannot_stage ... ok
+test git::git_write::prepared_add::tests::configuration_failure_reports_status_without_configuration_contents ... ok
+test git::git_write::prepared_add::tests::discovery_and_mutation_share_command_budget ... FAILED
+test git::git_write::prepared_add::tests::discovery_proof_cannot_enter_mutation_dispatch ... ok
+test git::git_write::prepared_add::tests::discovery_reports_budget_exhaustion_without_misdiagnosing_installation ... ok
+test git::git_write::prepared_add::tests::disabled_fsmonitor_spellings_match_host_git ... FAILED
+test git::git_write::prepared_add::tests::discovery_defers_auxiliary_reads_until_separate_admission ... FAILED
+test git::git_write::prepared_add::tests::checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes ... FAILED
+test git::git_write::prepared_add::tests::external_gitlink_marker_is_planned_without_reading_destination ... ok
+test git::git_write::prepared_add::tests::git_configuration_path_discovery_includes_absent_global_candidates ... FAILED
+test git::git_write::prepared_add::tests::exact_approved_plan_stages_selected_file ... FAILED
+test git::git_write::prepared_add::tests::discovery_runner_suppresses_configured_trace_files ... ok
+test git::git_write::prepared_add::tests::included_config_preserves_mixed_duplicate_values ... FAILED
+test git::git_write::prepared_add::tests::local_push_receiver_requires_path_admission_without_receiver_reads ... FAILED
+test git::git_write::prepared_add::tests::git_command_evidence_is_final_bound_and_redacted ... FAILED
+test git::git_write::prepared_add::tests::native_pull::native_pull_plan_rejects_changed_operation_before_discovery ... ok
+test git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard ... ok
+test git::git_write::prepared_add::tests::mutation_refuses_auxiliary_replacement_after_discovery ... FAILED
+test git::git_write::prepared_add::tests::maintenance_pack_redirection_requires_separate_effect_authorization ... ok
+test git::git_write::prepared_add::tests::native_pull::only_final_pull_stage_supplies_identity_bound_redacted_command_evidence ... ok
+test git::git_write::prepared_add::tests::prepared_add_preserves_unrelated_staged_and_unstaged_content ... FAILED
+test git::git_write::prepared_add::tests::large_tracked_source_edit_after_preparation_blocks_checkout ... ok
+test git::git_write::prepared_add::tests::new_gitlink_directory_binds_names_without_reading_descendants ... ok
+test git::git_write::prepared_add::tests::native_pull::native_pull_command_refuses_missing_stale_or_incomplete_authority ... ok
+test git::git_write::prepared_add::tests::prepared_push_transfers_objects_with_explicit_sideband_disabled ... FAILED
+test git::git_write::prepared_add::tests::prepared_push_transfers_objects_to_admitted_git_daemon ... FAILED
+test git::git_write::prepared_add::tests::push_discovery_binds_rewritten_destinations_and_requires_fresh_admission ... FAILED
+test git::git_write::prepared_add::tests::commit_maintenance_recent_objects_hook_requires_execution_authorization ... FAILED
+test git::git_write::prepared_add::tests::push_program_rebind_preserves_sender_effects_without_receiver_reads ... FAILED
+test git::git_write::prepared_add::tests::push_rejects_legacy_destination_inserted_after_discovery ... FAILED
+test git::git_write::prepared_add::tests::push_program_rebind_rejects_changed_destination_plan ... FAILED
+test git::git_write::prepared_add::tests::pull_command::native_command_discovery_then_one_mutation_preserves_configured_hook ... ok
+test git::git_write::prepared_add::tests::pull_command::native_command_refuses_configuration_drift_before_fetch ... FAILED
+test git::git_write::prepared_add::tests::pull_command::native_command_preview_withholds_config_credentials_and_helper_payloads ... ok
+test git::git_write::prepared_add::tests::promisor_remote_maintenance_refuses_before_mutation ... ok
+test git::git_write::prepared_add::tests::pull_command::native_command_conflict_preserves_partial_effects_without_repair ... ok
+test git::git_write::prepared_add::tests::push_rejects_sender_ref_changes_after_discovery ... FAILED
+test git::git_write::prepared_add::tests::push_rejects_symbolic_and_detached_head_changes_after_discovery ... FAILED
+test git::git_write::prepared_add::tests::native_pull::native_pull_owned_runner_retains_fetch_and_conflict_effects ... ok
+test git::git_write::prepared_add::tests::receiver_shell_rejects_runtime_overrides_case_insensitively ... ok
+test git::git_write::prepared_add::tests::native_pull::native_pull_owned_runner_uses_upstream_and_configured_rebase ... ok
+test git::git_write::prepared_add::tests::receiver_shell_startup_environment_refuses_without_mutating_parent_snapshot ... ok
+test git::git_write::prepared_add::tests::receiver_layout_stages_accept_real_bare_normal_and_linked_repositories ... FAILED
+test git::git_write::prepared_add::tests::receiver_metadata_stage_rejects_changed_root_marker ... FAILED
+test git::git_write::prepared_add::tests::receiver_windows_shell_noninteractive_command_does_not_source_home_startup ... FAILED
+test git::git_write::prepared_add::tests::receiver_metadata_wave_defers_pointer_targets_and_binds_changes ... FAILED
+test git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked ... FAILED
+test git::git_write::prepared_add::tests::receiver_child_requires_read_admission_before_capture ... FAILED
+test git::git_write::prepared_add::tests::receiver_home_includes_refuse_ambiguous_interpolation ... FAILED
+test git::git_write::prepared_add::tests::real_commit_runs_configured_automatic_maintenance ... FAILED
+test git::git_write::prepared_add::tests::receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof ... FAILED
+test git::git_write::prepared_add::tests::retained_child_evidence_rejects_changes_after_inspection_returns ... ok
+test git::git_write::prepared_add::tests::receiver_reference_tree_refuses_exact_paths_without_closed_capability ... FAILED
+test git::git_write::prepared_add::tests::rerere_refuses_active_records_but_preserves_inert_and_disabled_configurations ... FAILED
+test git::git_write::prepared_add::tests::receiver_multiple_destinations_keep_sibling_bisect_evidence_separate ... FAILED
+test git::git_write::prepared_add::tests::tracked_child_sources_detect_edits_without_reading_untracked_replacement_tree ... ok
+test git::git_write::prepared_add::tests::windows_internal_program_report_matches_only_retained_canonical_spelling ... ok
+test git::git_write::prepared_add::tests::receiver_skiplist_requires_target_read_and_retains_leaf_identity ... FAILED
+test git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup ... ok
+test git::git_write::pull_resolution::tests::budget_is_cumulative_and_failed_charge_is_atomic ... ok
+test git::git_write::pull_resolution::tests::component_queue_reservation_precedes_metadata_discovery ... ok
+test git::git_write::pull_resolution::tests::missing_components_and_cancelled_ancestors_remain_bound ... ok
+test git::git_write::pull_resolution::tests::rejects_files_even_when_cancelled ... ok
+test git::git_write::pull_resolution::tests::verbatim_disk_resolution_records_the_complete_root ... ok
+test git::git_write::receiver_state::pull_budget_tests::pull_metadata_preserves_pointer_size_limit ... ok
+test git::git_write::prepared_add::tests::windows_receiver_command_executes_special_path_without_shell_injection ... FAILED
+test git::git_write::prepared_add::tests::receiver_shell_selection_probe_rejects_stale_spelling ... FAILED
+test git::git_write::receiver_state::tests::backlink_requires_admission_and_original_gitdir_identity ... ok
+test git::git_write::receiver_state::pull_budget_tests::pull_pointer_bytes_share_budget_across_sources ... ok
+test git::git_write::receiver_state::tests::directory_marker_is_not_recursively_read ... ok
+test git::git_write::receiver_state::tests::common_wave_binds_marker_and_defers_backlink_target ... ok
+test git::git_write::receiver_state::tests::include_inventory_preserves_all_declarations_and_source_bases ... ok
+test git::git_write::receiver_state::tests::include_inventory_rejects_implicit_and_empty_paths ... ok
+test git::git_write::receiver_state::tests::local_config_hint_is_bounded_and_does_not_expand_includes ... ok
+test git::git_write::receiver_state::tests::metadata_revalidation_binds_branch_conditional_head ... ok
+test git::git_write::receiver_state::tests::metadata_without_pointers_keeps_admitted_directory ... ok
+test git::git_write::prepared_add::tests::retained_push_refuses_changed_invocation_before_transport ... FAILED
+test git::git_write::receiver_state::tests::receiver_reference_budget_spans_common_and_sibling_roots ... ok
+test git::git_write::prepared_add::tests::sender_program_binding_requires_new_exact_read_admission ... ok
+test git::git_write::receiver_state::tests::receiver_refs_refuse_unbound_backend_and_share_capture_budget ... ok
+test git::git_write::receiver_state::tests::root_marker_changes_invalidate_evidence_without_opening_target ... ok
+test git::git_write::receiver_state::tests::rebase_state_binds_directory_and_each_occupancy_file ... ok
+test git::git_write::receiver_state::tests::host_layout_bootstrap_does_not_expand_global_or_include_configuration ... ok
+test git::git_write::receiver_state::tests::worktree_inventory_binds_names_and_defers_child_contents ... ok
+test git::git_write::receiver_state::tests::sibling_targets_defer_relative_backlink_and_bind_marker ... ok
+test git::git_write::remote_state::destination_records_preserve_subsection_case_and_ignore_boolean_options ... ok
+test git::git_write::remote_state::direct_destinations_and_ambiguous_output ... ok
+test git::git_write::receiver_state::tests::worktree_specific_layout_hints_retain_both_candidate_paths ... ok
+test git::git_write::receiver_state::tests::receiver_refs_bind_chains_packed_and_private_namespaces ... ok
+test git::git_write::remote_state::legacy_remote_destinations_cannot_silently_bypass_config_resolution ... ok
+test git::git_write::remote_state::local_receivers_are_paths_and_helpers_are_not_network_authority ... ok
+test git::git_write::prepared_add::tests::sender_location_redirection_refuses_before_repository_rediscovery ... ok
+test git::git_write::receiver_storage::tests::storage_binds_missing_entries_and_shared_budget_without_reading_object_bytes ... ok
+test git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget ... FAILED
+test git::git_write::repository_state::tests::child_location_binds_commondir_without_reading_shared_contents ... ok
+test git::git_write::repository_state::tests::commit_metadata_rejects_directory_as_scalar_and_file_as_cache ... ok
+test git::git_write::repository_state::tests::commit_state_binds_merge_inputs_and_refuses_autostash ... ok
+test git::git_write::remote_state::equal_length_rewrites_follow_base_group_order_in_host_git ... ok
+test git::git_write::remote_state::empty_generated_push_alias_resets_previous_destinations_like_git ... FAILED
+test git::git_write::prepared_add::tests::sender_program_binding_keeps_each_native_command_frozen ... FAILED
+test git::git_write::snapshot::budget_tests::failed_and_oversized_reads_consume_observed_bytes ... ok
+test git::git_write::snapshot::digest_tests::tracked_digest_charges_shared_io_budget_and_reports_exhaustion ... ok
+test git::git_write::repository_state::tests::alternate_and_split_index_layouts_are_refused ... ok
+test git::git_write::snapshot::digest_tests::tracked_digest_detects_same_length_edit_beyond_first_chunk_with_restored_mtime ... ok
+test git::git_write::snapshot::tests::budget_is_shared_and_never_returns_partial_tree ... ok
+test git::git_write::snapshot::tests::nested_repository_is_refused_before_a_partial_snapshot ... ok
+test git::git_write::snapshot::tests::only_explicit_worktree_root_can_exclude_its_own_metadata ... ok
+test git::git_write::snapshot::tests::path_identity_retains_leaf_and_ancestor_identity ... ok
+test git::git_write::snapshot::tests::regular_capture_refuses_directory_without_charging_child_contents ... ok
+test git::git_write::prepared_add::tests::sender_configuration_sources_remain_readable_after_rebinding ... ok
+test git::git_write::snapshot::tests::selected_tree_detects_content_addition_and_deletion ... ok
+test git::git_write::status_state::tests::ignore_directory_is_rejected_without_consuming_body_budget ... ok
+test git::git_write::snapshot::tests::regular_evidence_rejects_identical_byte_inode_replacement ... ok
+test git::git_write::status_state::tests::pack_attributes_cover_untracked_historical_directories_without_file_bodies ... ok
+test git::git_write::target_config::path_tests::admitted_windows_paths_use_git_matching_spelling ... ok
+test git::git_write::target_config::path_tests::condition_matching_normalizes_paths_without_changing_glob_escapes ... ok
+test git::git_write::status_state::tests::status_binds_untracked_names_and_ignore_rules_without_file_bodies ... ok
+test git::git_write::target_config::tests::admitted_source_frontiers_defer_nested_reads_and_bind_absence ... ok
+test git::git_write::target_config::tests::complex_branch_pattern_refuses_before_dependency_recursion_guard ... ok
+test git::git_write::prepared_add::tests::native_pull::recursion::native_pull_owned_runner_preserves_configured_submodule_recursion ... ok
+test git::git_write::repository_state::tests::snapshot_detects_index_head_and_local_config_changes ... ok
+test git::git_write::snapshot::regular_tests::streaming_revalidation_checks_chunks_length_identity_and_absence ... ok
+test git::git_write::repository_state::tests::loose_reference_changes_invalidate_snapshot_without_new_objects ... ok
+test git::git_write::target_config::tests::hasconfig_comparisons_share_a_cumulative_budget ... ok
+test git::git_write::repository_state::tests::linked_worktree_snapshot_uses_its_own_index_and_shared_config ... ok
+test git::git_write::target_config::tests::lexical_frontier_retains_order_without_opening_named_paths ... ok
+test git::git_write::target_config::tests::linked_gitdir_context_requires_admission_without_reading_children ... ok
+test git::git_write::target_config::tests::malformed_file_fails_without_exposing_its_contents ... ok
+test git::git_write::target_config::tests::optional_directory_frontier_retains_absence_and_rejects_later_creation ... ok
+test git::git_write::receiver_state::pull_budget_tests::pull_metadata_uses_shared_budget_including_missing_pointers ... ok
+test git::git_write::target_config::tests::host_root_order_and_worktree_selection_match_native_git ... FAILED
+test git::git_write::prepared_add::tests::retained_commit_refuses_changed_message_or_mode_before_mutation ... ok
+test git::git_write::target_config::tests::hasconfig_non_path_key_still_triggers_url_prohibition ... ok
+test git::git_write::target_config::tests::detached_head_never_matches_onbranch_wildcards ... ok
+test git::git_write::target_config::tests::source_frontiers_require_ancestor_admission_and_refuse_links ... ok
+test git::git_write::target_config::tests::parses_ordered_values_without_resolving_includes ... ok
+test git::git_write::target_config::tests::repeated_comment_only_sources_charge_parse_work_before_parsing ... ok
+test git::git_write::target_config::tests::source_request_budget_is_cumulative_including_ancestors ... ok
+test git::git_write::target_config::tests::hasconfig_lookahead_and_url_prohibition_match_native_git ... ok
+test git::git_write::target_config::tests::source_parser_enforces_byte_and_record_limits ... ok
+test git::git_write::target_config::tests::repeated_include_expansion_has_a_cumulative_payload_budget ... ok
+test git::tests::git_diff_display_escaping_does_not_alias_literal_backslashes ... ok
+test git::git_write::target_config::tests::verbatim_join_normalization_precedes_source_admission ... ok
+test git::git_write::target_config::tests::tracking_overlay_bounds_empty_section_and_write_payloads ... ok
+test git::git_write::target_config::tests::ordered_expansion_matches_native_git_at_include_positions ... ok
+test git::git_write::repository_state::tests::packed_and_linked_worktree_references_invalidate_snapshot ... ok
+test git::git_write::target_config::tests::ordered_expansion_obeys_depth_missing_and_cycle_rules ... ok
+test git::git_write::remote_state::rewritten_push_destinations_match_host_without_network ... FAILED
+test git::tests::git_diff_line_limit_counts_metadata_and_exact_boundary ... ok
+test git::tests::git_diff_read_errors_are_not_missing_content ... ok
+test git::git_write::prepared_add::tests::retained_add_refuses_changed_invocation_before_staging ... ok
+test git::git_write::target_config::tests::gitdir_conditions_match_native_with_admitted_directory_identity ... ok
+test git::tests::git_diff_literal_path_boundary_and_untracked_exclusion ... ok
+test git::git_write::target_config::tests::source_records_match_native_git_syntax_and_order ... ok
+test git::tests::git_diff_missing_and_uninitialized_submodule_match_git ... ok
+test git::git_write::target_config::tests::tracking_overlay_matches_native_checkout_section_order_and_duplicates ... FAILED
+test git::tests::git_diff_distinguishes_add_delete_and_binary ... ok
+test git::tests::git_diff_reports_empty_file_addition ... ok
+test git::tests::git_pull_permission_profile_has_execute_remote_and_workspace_write ... ok
+test git::tests::git_pull_refuses_legacy_execution_until_prepared_effects_exist ... ok
+test git::tests::git_push_refuses_legacy_execution_without_prepared_admission ... ok
+test git::tests::host_git_unavailable_returns_actionable_error ... ok
+test process_boundary::handle_snapshot::evidence_caps_fail_instead_of_reporting_partial_success ... ok
+test process_boundary::handle_snapshot::metadata_predicates_reject_without_dereferencing_fabricated_addresses ... ok
+test process_boundary::handle_snapshot::two_release_errors_are_retained_in_order_without_retry ... ok
+test process_boundary::handle_snapshot::unknown_type_is_not_replaced_with_an_inferred_type ... ok
+test process_boundary::native_inventory::checkout_crlf_preserves_reviewed_native_inventory ... ok
+test git::git_write::prepared_add::tests::native_pull::recursion::native_pull_fetches_deinitialized_stored_submodule ... ok
+test process_boundary::native_inventory::reviewed_native_sites_and_instrumentation_are_unchanged ... ok
+test process_boundary::resource_acceptance::actual_result_predicates_fail_closed_and_never_retry_release ... ok
+test process_boundary::resource_acceptance::termination_requires_real_success_and_signalled_wait_and_rejects_second_call ... ok
+test process_boundary::windows_command_line::tests::preserves_unpaired_utf16_without_replacement ... ok
+test process_boundary::windows_command_line::tests::quoting_handles_empty_quotes_and_trailing_backslashes ... ok
+test process_boundary::native_inventory::inventory_rejects_uncovered_calls_and_removed_or_moved_observation ... ok
+test process_boundary::windows_cwd::tests::canonical_drive_directory_retains_target_without_verbatim_prefix ... ok
+test process_boundary::windows_cwd::tests::normalization_sensitive_verbatim_directory_is_preserved ... ok
+test process_boundary::windows_command_line::tests::rejects_nul_and_enforces_limit_including_terminator ... ok
+test process_boundary::windows_environment::tests::empty_and_nonempty_blocks_have_double_nul_terminators ... ok
+test process_boundary::windows_environment::tests::invalid_entries_fail_without_returning_a_partial_block ... ok
+test process_boundary::windows_environment::tests::explicit_snapshot_overrides_case_equivalent_keys_and_preserves_nonunicode ... ok
+test process_boundary::windows_environment::tests::preserves_raw_utf16_and_drive_current_directory ... ok
+test git::tests::git_diff_path_filter_excludes_non_matching ... ok
+test process_boundary::windows_foreground::tests::dropped_reservation_is_sticky_but_other_operations_are_isolated ... ok
+test git::tests::git_diff_produces_unified_diff_content ... ok
+test git::tests::git_diff_retains_index_executable_mode_without_filemode_tracking ... ok
+test process_boundary::windows_foreground::tests::foreground_launch_observes_pre_cancel_closed_sender_and_expired_deadline ... ok
+test git::tests::git_diff_submodule_replaced_by_file_preserves_content ... ok
+test git::tests::git_diff_ref_comparison_rejects_oversized_host_output ... ok
+test git::tests::git_diff_does_not_present_one_conflict_stage_as_an_ordinary_diff ... ok
+test process_boundary::windows_foreground::tests::launch_checkpoints_refuse_before_payload_can_run ... ok
+test process_boundary::windows_foreground::tests::ordinary_io_error_has_completed_resource_ownership ... ok
+test process_boundary::windows_foreground::tests::panicked_io_worker_never_confirms_cleanup ... ok
+test git::tests::git_diff_staged_gitlink_uses_oid_without_loading_submodule_object ... ok
+test process_boundary::windows_launch_command_tests::finite_input_pipe_delivers_bytes_then_eof_and_inherits_only_reader ... ok
+test process_boundary::windows_launch_command_tests::job_cleanup_confirms_empty_job_and_rejects_invalid_handle ... ok
+test process_boundary::windows_launch_command_tests::job_cleanup_confirms_live_process_exit_before_returning ... ok
+test process_boundary::windows_launch_command_tests::native_launch_inputs_preserve_raw_arguments_and_frozen_environment ... ok
+test process_boundary::windows_foreground::tests::foreground_timeout_confirms_job_and_io_cleanup ... ok
+test process_boundary::windows_launch_command_tests::no_input_launch_owns_inheritable_nul_with_immediate_eof ... ok
+test git::git_write::target_config::tests::branch_frontier_matches_native_conditional_includes ... ok
+test process_boundary::windows_tests::call_receipt_requires_complete_matching_checkpoints ... ok
+test git::tests::git_diff_staged_shows_head_vs_index ... ok
+test process_boundary::windows_foreground::tests::typed_start_evidence_preserves_preflight_refusal_and_started_timeout ... ok
+test process_boundary::windows_tests::handle_receipt_failures_are_results_not_early_panics ... ok
+test process_boundary::windows_tests::direct_lifecycle_receipt_preserves_growth_as_evidence ... ok
+test process_boundary::windows_tests::handle_stage_receipt_requires_exact_phase_order ... ok
+test process_boundary::windows_tests::known_resource_receipts_require_actual_complete_summary_and_negatives ... ok
+test process_boundary::windows_tests::windows_environment_filters_dangerous_names_case_insensitively ... ok
+test process_boundary::windows_tests::windows_assignment_failure_cleans_suspended_process_without_running_marker ... ok
+test process_boundary::windows_foreground::tests::dropped_foreground_wait_keeps_cleanup_owned ... ok
+test process_boundary::windows_tests::windows_job_rejects_invalid_working_directory_without_spawning ... ok
+test git::git_write::prepared_add::tests::pull_command::native_command_refuses_frozen_invocation_substitution_before_fetch ... ok
+test git::tests::git_diff_ref_comparison_requires_two_resolved_refs ... ok
+test process_boundary::windows_foreground::tests::foreground_finite_binary_input_reaches_eof_and_returns_exact_output ... ok
+test process_boundary::windows_tests::windows_resume_failure_cleans_assigned_process_and_handles ... ok
+test process_boundary::windows_tests::windows_unsupported_job_host_is_rejected_fail_closed ... ok
+test process_boundary::windows_foreground::tests::cancelling_one_foreground_operation_preserves_another_live_job ... ok
+test search_engine::regression_tests::test_gitignore_respected ... ok
+test search_engine::regression_tests::test_hidden_dir_at_depth_0 ... ok
+test search_engine::regression_tests::test_binary_file_skipped ... ok
+test search_engine::regression_tests::test_include_with_path_scope ... ok
+test search_engine::regression_tests::test_invalid_regex_returns_error ... ok
+test process_boundary::windows_tests::windows_job_termination_reaches_terminal_event ... ok
+test search_engine::regression_tests::test_legacy_parity_basic ... ok
+test process_boundary::windows_foreground::tests::foreground_large_input_drains_both_output_pipes_concurrently ... ok
+test search_engine::regression_tests::test_ignore_file_respected ... ok
+test search_engine::regression_tests::test_no_matches_returns_empty ... ok
+test search_engine::regression_tests::test_node_modules_dir_skipped ... ok
+test search_engine::regression_tests::test_oversized_file_skipped_and_reported ... ok
+test search_engine::regression_tests::test_max_results_truncation ... ok
+test search_engine::regression_tests::test_single_file_search ... ok
+test search_engine::regression_tests::test_target_dir_skipped ... ok
+test search_engine::regression_tests::test_invalid_utf8_does_not_fail_whole_search ... ok
+test search_engine::regression_tests::test_unicode_content ... ok
+test search_tools::glob_tool_tests::test_glob_file_count ... ok
+test search_tools::glob_tool_tests::test_glob_no_match ... ok
+test search_tools::glob_tool_tests::test_glob_specific_dir ... ok
+test search_tools::glob_tool_tests::test_glob_recursive_rs ... ok
+test search_tools::glob_tool_tests::test_glob_tool_is_read_only ... ok
+test search_engine::regression_tests::test_long_match_line_is_output_bounded ... ok
+test search_tools::glob_tool_tests::test_glob_toml_files ... ok
+test process_boundary::windows_foreground::tests::foreground_output_limit_terminates_writer_and_confirms_cleanup ... ok
+test search_tools::grep_tool_tests::test_grep_basic_match ... ok
+test search_tools::glob_tool_tests::test_glob_with_path_param ... ok
+test search_tools::glob_tool_tests::test_glob_top_level_pattern ... ok
+test search_tools::grep_tool_tests::test_grep_include_filter ... ok
+test search_tools::grep_tool_tests::test_grep_invalid_regex ... ok
+test search_tools::grep_tool_tests::test_grep_max_results ... ok
+test search_tools::grep_tool_tests::test_grep_path_escape_rejected ... ok
+test search_tools::grep_tool_tests::test_grep_no_match ... ok
+test search_tools::grep_tool_tests::test_grep_path_not_found ... ok
+test search_tools::grep_tool_tests::test_grep_reports_binary_skip_summary ... ok
+test search_tools::grep_tool_tests::test_grep_single_file ... ok
+test search_tools::grep_tool_tests::test_grep_tool_is_read_only ... ok
+test tree::tests::tree_root_first_line_uses_workspace_directory_name ... ok
+test search_tools::grep_tool_tests::test_grep_skips_hidden_dirs ... ok
+test tree::tests::tree_subdir_first_line_uses_target_relative_name ... ok
+test process_boundary::windows_launch_command_tests::no_input_child_observes_eof ... ok
+test search_engine::regression_tests::test_talos_repo_query_smoke_matches_legacy ... ok
+test search_tools::grep_tool_tests::test_grep_reports_oversized_skip_summary ... ok
+test search_tools::grep_tool_tests::test_grep_regex_pattern ... ok
+test process_boundary::windows_tests::windows_job_captures_output_and_reaps_process ... ok
+test process_boundary::windows_tests::windows_child_runs_only_after_job_assignment_and_resume ... ok
+test process_boundary::windows_tests::windows_partial_setup_failures_release_every_parent_handle ... ok
+test process_boundary::windows_tests::windows_concurrent_spawn_excludes_unrelated_inheritable_handle ... ok
+test process_boundary::windows_tests::windows_job_termination_reaps_a_powershell_grandchild ... ok
+test git::tests::git_diff_unstaged_submodule_head_and_dirty_content_match_git ... ok
+test process_boundary::windows_tests::windows_job_preserves_descendant_output_after_leader_exit ... ok
+test process_boundary::windows_foreground::tests::foreground_leader_exit_reaps_descendant_with_redirected_stdio ... ok
+test git::git_write::prepared_add::tests::retained_checkout_refuses_changed_invocation_before_mutation ... ok
+test git::git_write::prepared_add::tests::native_pull::recursion::native_command_authority_preserves_initialized_and_deinitialized_recursion ... ok
+
+failures:
+
+---- git::git_write::host_boundary_tests::literal_add_does_not_expand_options_or_pathspecs stdout ----
+
+thread 'git::git_write::host_boundary_tests::literal_add_does_not_expand_options_or_pathspecs' (17620) panicked at crates\talos-tools\src\git_write.rs:396:14:
+stage literal option: Git("invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- git::git_write::host_boundary_tests::literal_add_resolves_subworkspace_and_preserves_other_index_entries stdout ----
+
+thread 'git::git_write::host_boundary_tests::literal_add_resolves_subworkspace_and_preserves_other_index_entries' (9512) panicked at crates\talos-tools\src\git_write.rs:381:14:
+stage: Git("invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::host_boundary_tests::literal_add_supports_directory_deletions_and_contained_absolute_paths stdout ----
+
+thread 'git::git_write::host_boundary_tests::literal_add_supports_directory_deletions_and_contained_absolute_paths' (14196) panicked at crates\talos-tools\src\git_write.rs:462:14:
+stage subtree: Git("invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::positional_argument_tests::checkout_previous_branch_shorthand_preserves_branch_switch stdout ----
+
+thread 'git::git_write::positional_argument_tests::checkout_previous_branch_shorthand_preserves_branch_switch' (15220) panicked at crates\talos-tools\src\git_write.rs:1169:9:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::positional_argument_tests::checkout_preserves_guess_with_negative_fetch_mapping stdout ----
+
+thread 'git::git_write::positional_argument_tests::checkout_preserves_guess_with_negative_fetch_mapping' (9808) panicked at crates\talos-tools\src\git_write.rs:1122:9:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::positional_argument_tests::checkout_preserves_unique_remote_tracking_guess stdout ----
+
+thread 'git::git_write::positional_argument_tests::checkout_preserves_unique_remote_tracking_guess' (20564) panicked at crates\talos-tools\src\git_write.rs:1076:9:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::positional_argument_tests::checkout_branch_name_never_restores_a_matching_file stdout ----
+
+thread 'git::git_write::positional_argument_tests::checkout_branch_name_never_restores_a_matching_file' (5196) panicked at crates\talos-tools\src\git_write.rs:1037:9:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_created_branch_binds_native_previous_name_expansion stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_created_branch_binds_native_previous_name_expansion' (15524) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1311:10:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_file_directory_transitions_and_conflicting_edits stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_file_directory_transitions_and_conflicting_edits' (13856) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1655:9:
+directory: invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head' (3924) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:84:10:
+discover: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_index_only_filter_refuses_before_mutation stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_index_only_filter_refuses_before_mutation' (13984) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:3203:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_adds_uninitialized_gitlink_and_removes_dirty_initialized_gitlink stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_adds_uninitialized_gitlink_and_removes_dirty_initialized_gitlink' (10260) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:2955:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_guess_binds_remote_and_reference_even_for_equal_commits stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_guess_binds_remote_and_reference_even_for_equal_commits' (21348) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1229:14:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan' (12064) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:408:54:
+discovery: invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_protects_captured_target_only_config_from_tree_replacement stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_protects_captured_target_only_config_from_tree_replacement' (4880) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:469:10:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_same_oid_previous_branch_reflog_change_invalidates_plan stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_same_oid_previous_branch_reflog_change_invalidates_plan' (12700) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1366:10:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_refuses_to_rewrite_effective_configuration_and_attributes stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_refuses_to_rewrite_effective_configuration_and_attributes' (19720) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1590:9:
+include.path: invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_target_configuration_limits_refuse_before_mutation stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_configuration_limits_refuse_before_mutation' (17712) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:711:9:
+bytes: invalid input: Git configuration path discovery unavailable; use a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_target_hook_missing_evidence_refuses_later_creation stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_hook_missing_evidence_refuses_later_creation' (14716) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1024:10:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree' (20300) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:3059:6:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_and_commit_support_tracked_content_over_16_mib stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_and_commit_support_tracked_content_over_16_mib' (12192) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:3298:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_many_nested_directories_share_auxiliary_ancestor_evidence stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_many_nested_directories_share_auxiliary_ancestor_evidence' (18964) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:3361:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_target_executable_hook_refuses_before_mutation stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_executable_hook_refuses_before_mutation' (11608) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1447:9:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_target_filter_refuses_before_worktree_mutation stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_filter_refuses_before_worktree_mutation' (18844) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:3262:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_target_hooks_wait_for_all_exact_read_tokens stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_hooks_wait_for_all_exact_read_tokens' (23160) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:849:14:
+discovery: InvalidInput("Git configuration path discovery unavailable; use a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_target_only_configuration_drift_invalidates_retained_plan stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_only_configuration_drift_invalidates_retained_plan' (8144) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:770:10:
+discovery: InvalidInput("Git configuration path discovery unavailable; use a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::child_config_discovery_detects_included_fsmonitor_before_status stdout ----
+
+thread 'git::git_write::prepared_add::tests::child_config_discovery_detects_included_fsmonitor_before_status' (7612) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:347:10:
+disabled fsmonitor should discover: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::child_invalid_index_is_read_only_after_continuation_admission stdout ----
+
+thread 'git::git_write::prepared_add::tests::child_invalid_index_is_read_only_after_continuation_admission' (14424) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:273:10:
+discovery must not read child index: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_tracked_file_to_gitlink_preserves_dirty_source stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_tracked_file_to_gitlink_preserves_dirty_source' (22008) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:2490:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_tracking_prediction_from_detached_head_matches_native stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_tracking_prediction_from_detached_head_matches_native' (3364) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1097:14:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_target_tree_cannot_create_or_replace_late_hook stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_target_tree_cannot_create_or_replace_late_hook' (8848) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:629:9:
+invalid input: Git configuration path discovery unavailable; use a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_tracking_prediction_matches_native_mode_matrix stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_tracking_prediction_matches_native_mode_matrix' (4632) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:1161:22:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::child_status_filter_is_refused_without_executing_helper stdout ----
+
+thread 'git::git_write::prepared_add::tests::child_status_filter_is_refused_without_executing_helper' (21468) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:183:6:
+child attribute discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_signing stdout ----
+
+thread 'git::git_write::prepared_add::tests::commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_signing' (5196) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:947:10:
+ordinary config discovery refused: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::commit_inspects_parent_filters_before_mutation_in_both_modes stdout ----
+
+thread 'git::git_write::prepared_add::tests::commit_inspects_parent_filters_before_mutation_in_both_modes' (3452) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:823:9:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::checkout_new_gitlink_preserves_initialized_child stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_new_gitlink_preserves_initialized_child' (15280) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:2178:13:
+mode=prepared: ToolResult { content: "invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation", is_error: true, continuations: [], todo_presentation: None }
+
+---- git::git_write::prepared_add::tests::commit_all_deletes_replaced_tracked_file_and_refuses_nested_repository stdout ----
+
+thread 'git::git_write::prepared_add::tests::commit_all_deletes_replaced_tracked_file_and_refuses_nested_repository' (7620) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:563:13:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::discovery_and_mutation_share_command_budget stdout ----
+
+thread 'git::git_write::prepared_add::tests::discovery_and_mutation_share_command_budget' (22768) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:143:48:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::disabled_fsmonitor_spellings_match_host_git stdout ----
+
+thread 'git::git_write::prepared_add::tests::disabled_fsmonitor_spellings_match_host_git' (21912) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:950:9:
+"false": invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::discovery_defers_auxiliary_reads_until_separate_admission stdout ----
+
+thread 'git::git_write::prepared_add::tests::discovery_defers_auxiliary_reads_until_separate_admission' (12152) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:819:10:
+discovery must not read auxiliary directory: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes stdout ----
+
+thread 'git::git_write::prepared_add::tests::checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes' (16324) panicked at crates\talos-tools\src\git_write\prepared_add_tests/checkout.rs:2311:22:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::git_configuration_path_discovery_includes_absent_global_candidates stdout ----
+
+thread 'git::git_write::prepared_add::tests::git_configuration_path_discovery_includes_absent_global_candidates' (11660) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:620:10:
+path query: InvalidInput("Git configuration path discovery unavailable; use a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::exact_approved_plan_stages_selected_file stdout ----
+
+thread 'git::git_write::prepared_add::tests::exact_approved_plan_stages_selected_file' (23344) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:789:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::included_config_preserves_mixed_duplicate_values stdout ----
+
+thread 'git::git_write::prepared_add::tests::included_config_preserves_mixed_duplicate_values' (11016) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:881:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::local_push_receiver_requires_path_admission_without_receiver_reads stdout ----
+
+thread 'git::git_write::prepared_add::tests::local_push_receiver_requires_path_admission_without_receiver_reads' (8724) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1498:9:
+discovery failed
+
+---- git::git_write::prepared_add::tests::git_command_evidence_is_final_bound_and_redacted stdout ----
+
+thread 'git::git_write::prepared_add::tests::git_command_evidence_is_final_bound_and_redacted' (7280) panicked at crates\talos-tools\src\git_write\prepared_add_tests/command_evidence.rs:23:52:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::mutation_refuses_auxiliary_replacement_after_discovery stdout ----
+
+thread 'git::git_write::prepared_add::tests::mutation_refuses_auxiliary_replacement_after_discovery' (10300) panicked at crates\talos-tools\src\git_write\prepared_add_tests/authorization.rs:855:68:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::prepared_add_preserves_unrelated_staged_and_unstaged_content stdout ----
+
+thread 'git::git_write::prepared_add::tests::prepared_add_preserves_unrelated_staged_and_unstaged_content' (15320) panicked at crates\talos-tools\src\git_write\prepared_add_tests/staging.rs:54:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::prepared_push_transfers_objects_with_explicit_sideband_disabled stdout ----
+
+thread 'git::git_write::prepared_add::tests::prepared_push_transfers_objects_with_explicit_sideband_disabled' (21836) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1178:48:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::prepared_push_transfers_objects_to_admitted_git_daemon stdout ----
+
+thread 'git::git_write::prepared_add::tests::prepared_push_transfers_objects_to_admitted_git_daemon' (5932) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1178:48:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::push_discovery_binds_rewritten_destinations_and_requires_fresh_admission stdout ----
+
+thread 'git::git_write::prepared_add::tests::push_discovery_binds_rewritten_destinations_and_requires_fresh_admission' (19052) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:2422:48:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::commit_maintenance_recent_objects_hook_requires_execution_authorization stdout ----
+
+thread 'git::git_write::prepared_add::tests::commit_maintenance_recent_objects_hook_requires_execution_authorization' (20944) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:65:13:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::push_program_rebind_preserves_sender_effects_without_receiver_reads stdout ----
+
+thread 'git::git_write::prepared_add::tests::push_program_rebind_preserves_sender_effects_without_receiver_reads' (1896) panicked at crates\talos-tools\src\git_write\prepared_add_tests/sender_program.rs:132:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::push_rejects_legacy_destination_inserted_after_discovery stdout ----
+
+thread 'git::git_write::prepared_add::tests::push_rejects_legacy_destination_inserted_after_discovery' (4104) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1410:52:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::push_program_rebind_rejects_changed_destination_plan stdout ----
+
+thread 'git::git_write::prepared_add::tests::push_program_rebind_rejects_changed_destination_plan' (22504) panicked at crates\talos-tools\src\git_write\prepared_add_tests/sender_program.rs:190:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::pull_command::native_command_refuses_configuration_drift_before_fetch stdout ----
+
+thread 'git::git_write::prepared_add::tests::pull_command::native_command_refuses_configuration_drift_before_fetch' (1020) panicked at crates\talos-tools\src\git_write\prepared_add_tests\native_pull.rs:149:5:
+["config", "pull.rebase", "true"]: Output { status: ExitStatus(ExitStatus(4)), stdout: "", stderr: "error: could not write config file .git/config: Permission denied\n" }
+
+---- git::git_write::prepared_add::tests::push_rejects_sender_ref_changes_after_discovery stdout ----
+
+thread 'git::git_write::prepared_add::tests::push_rejects_sender_ref_changes_after_discovery' (22304) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1458:52:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::push_rejects_symbolic_and_detached_head_changes_after_discovery stdout ----
+
+thread 'git::git_write::prepared_add::tests::push_rejects_symbolic_and_detached_head_changes_after_discovery' (19588) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1438:52:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::receiver_layout_stages_accept_real_bare_normal_and_linked_repositories stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_layout_stages_accept_real_bare_normal_and_linked_repositories' (21740) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::receiver_metadata_stage_rejects_changed_root_marker stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_metadata_stage_rejects_changed_root_marker' (8868) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::receiver_windows_shell_noninteractive_command_does_not_source_home_startup stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_windows_shell_noninteractive_command_does_not_source_home_startup' (12148) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:588:5:
+assertion failed: discovery.status.success()
+
+---- git::git_write::prepared_add::tests::receiver_metadata_wave_defers_pointer_targets_and_binds_changes stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_metadata_wave_defers_pointer_targets_and_binds_changes' (13084) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked stdout ----
+
+thread 'git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked' (16660) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:726:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::receiver_child_requires_read_admission_before_capture stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_child_requires_read_admission_before_capture' (13096) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::receiver_home_includes_refuse_ambiguous_interpolation stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_home_includes_refuse_ambiguous_interpolation' (23448) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::real_commit_runs_configured_automatic_maintenance stdout ----
+
+thread 'git::git_write::prepared_add::tests::real_commit_runs_configured_automatic_maintenance' (18584) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:684:5:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof' (9432) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::receiver_reference_tree_refuses_exact_paths_without_closed_capability stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_reference_tree_refuses_exact_paths_without_closed_capability' (19000) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::rerere_refuses_active_records_but_preserves_inert_and_disabled_configurations stdout ----
+
+thread 'git::git_write::prepared_add::tests::rerere_refuses_active_records_but_preserves_inert_and_disabled_configurations' (588) panicked at crates\talos-tools\src\git_write\prepared_add_tests/commit.rs:872:17:
+invalid input: Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation
+
+---- git::git_write::prepared_add::tests::receiver_multiple_destinations_keep_sibling_bisect_evidence_separate stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_multiple_destinations_keep_sibling_bisect_evidence_separate' (4528) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:1780:9:
+Preparing worktree (new branch 'sibling')
+fatal: not a valid object name: 'HEAD'
+
+
+---- git::git_write::prepared_add::tests::receiver_skiplist_requires_target_read_and_retains_leaf_identity stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_skiplist_requires_target_read_and_retains_leaf_identity' (16492) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::windows_receiver_command_executes_special_path_without_shell_injection stdout ----
+
+thread 'git::git_write::prepared_add::tests::windows_receiver_command_executes_special_path_without_shell_injection' (9100) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:769:5:
+assertion failed: shell.status.success()
+
+---- git::git_write::prepared_add::tests::receiver_shell_selection_probe_rejects_stale_spelling stdout ----
+
+thread 'git::git_write::prepared_add::tests::receiver_shell_selection_probe_rejects_stale_spelling' (21248) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:4:52:
+sender discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::retained_push_refuses_changed_invocation_before_transport stdout ----
+
+thread 'git::git_write::prepared_add::tests::retained_push_refuses_changed_invocation_before_transport' (1540) panicked at crates\talos-tools\src\git_write\prepared_add_tests/push.rs:52:52:
+discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget stdout ----
+
+thread 'git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget' (19040) panicked at crates\talos-tools\src\git_write\prepared_add_tests/sender_program.rs:107:10:
+first discovery: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::remote_state::empty_generated_push_alias_resets_previous_destinations_like_git stdout ----
+
+thread 'git::git_write::remote_state::empty_generated_push_alias_resets_previous_destinations_like_git' (7592) panicked at crates\talos-tools\src\git_write\remote_state.rs:420:5:
+assertion `left == right` failed
+  left: ["x:first", "reset", "keep:last"]
+ right: ["git://example.invalid/first", ""]
+
+---- git::git_write::prepared_add::tests::sender_program_binding_keeps_each_native_command_frozen stdout ----
+
+thread 'git::git_write::prepared_add::tests::sender_program_binding_keeps_each_native_command_frozen' (15552) panicked at crates\talos-tools\src\git_write\prepared_add_tests/sender_program.rs:81:60:
+admitted executable binding: InvalidInput("Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation")
+
+---- git::git_write::target_config::tests::host_root_order_and_worktree_selection_match_native_git stdout ----
+
+thread 'git::git_write::target_config::tests::host_root_order_and_worktree_selection_match_native_git' (21668) panicked at crates\talos-tools\src\git_write\target_config.rs:2262:17:
+Output { status: ExitStatus(ExitStatus(129)), stdout: "", stderr: "usage: git var (-l | <variable>)\n" }
+
+---- git::git_write::remote_state::rewritten_push_destinations_match_host_without_network stdout ----
+
+thread 'git::git_write::remote_state::rewritten_push_destinations_match_host_without_network' (1156) panicked at crates\talos-tools\src\git_write\remote_state.rs:380:9:
+assertion `left == right` failed
+  left: ["git://write.invalid/one"]
+ right: ["git://read.invalid/explicit", "git://read.invalid/second", ""]
+
+---- git::git_write::target_config::tests::tracking_overlay_matches_native_checkout_section_order_and_duplicates stdout ----
+
+thread 'git::git_write::target_config::tests::tracking_overlay_matches_native_checkout_section_order_and_duplicates' (2836) panicked at crates\talos-tools\src\git_write\target_config.rs:1563:13:
+assertion `left == right` failed: suffix=
+  left: [Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }]
+ right: [Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }, Record { key: "<redacted>", value: Some("<redacted>") }]
+
+
+failures:
+    git::git_write::host_boundary_tests::literal_add_does_not_expand_options_or_pathspecs
+    git::git_write::host_boundary_tests::literal_add_resolves_subworkspace_and_preserves_other_index_entries
+    git::git_write::host_boundary_tests::literal_add_supports_directory_deletions_and_contained_absolute_paths
+    git::git_write::positional_argument_tests::checkout_branch_name_never_restores_a_matching_file
+    git::git_write::positional_argument_tests::checkout_preserves_guess_with_negative_fetch_mapping
+    git::git_write::positional_argument_tests::checkout_preserves_unique_remote_tracking_guess
+    git::git_write::positional_argument_tests::checkout_previous_branch_shorthand_preserves_branch_switch
+    git::git_write::prepared_add::tests::checkout_adds_uninitialized_gitlink_and_removes_dirty_initialized_gitlink
+    git::git_write::prepared_add::tests::checkout_and_commit_support_tracked_content_over_16_mib
+    git::git_write::prepared_add::tests::checkout_created_branch_binds_native_previous_name_expansion
+    git::git_write::prepared_add::tests::checkout_file_directory_transitions_and_conflicting_edits
+    git::git_write::prepared_add::tests::checkout_guess_binds_remote_and_reference_even_for_equal_commits
+    git::git_write::prepared_add::tests::checkout_index_only_filter_refuses_before_mutation
+    git::git_write::prepared_add::tests::checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head
+    git::git_write::prepared_add::tests::checkout_many_nested_directories_share_auxiliary_ancestor_evidence
+    git::git_write::prepared_add::tests::checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes
+    git::git_write::prepared_add::tests::checkout_new_gitlink_preserves_initialized_child
+    git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree
+    git::git_write::prepared_add::tests::checkout_protects_captured_target_only_config_from_tree_replacement
+    git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan
+    git::git_write::prepared_add::tests::checkout_refuses_to_rewrite_effective_configuration_and_attributes
+    git::git_write::prepared_add::tests::checkout_same_oid_previous_branch_reflog_change_invalidates_plan
+    git::git_write::prepared_add::tests::checkout_target_configuration_limits_refuse_before_mutation
+    git::git_write::prepared_add::tests::checkout_target_executable_hook_refuses_before_mutation
+    git::git_write::prepared_add::tests::checkout_target_filter_refuses_before_worktree_mutation
+    git::git_write::prepared_add::tests::checkout_target_hook_missing_evidence_refuses_later_creation
+    git::git_write::prepared_add::tests::checkout_target_hooks_wait_for_all_exact_read_tokens
+    git::git_write::prepared_add::tests::checkout_target_only_configuration_drift_invalidates_retained_plan
+    git::git_write::prepared_add::tests::checkout_target_tree_cannot_create_or_replace_late_hook
+    git::git_write::prepared_add::tests::checkout_tracked_file_to_gitlink_preserves_dirty_source
+    git::git_write::prepared_add::tests::checkout_tracking_prediction_from_detached_head_matches_native
+    git::git_write::prepared_add::tests::checkout_tracking_prediction_matches_native_mode_matrix
+    git::git_write::prepared_add::tests::child_config_discovery_detects_included_fsmonitor_before_status
+    git::git_write::prepared_add::tests::child_invalid_index_is_read_only_after_continuation_admission
+    git::git_write::prepared_add::tests::child_status_filter_is_refused_without_executing_helper
+    git::git_write::prepared_add::tests::commit_all_deletes_replaced_tracked_file_and_refuses_nested_repository
+    git::git_write::prepared_add::tests::commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_signing
+    git::git_write::prepared_add::tests::commit_inspects_parent_filters_before_mutation_in_both_modes
+    git::git_write::prepared_add::tests::commit_maintenance_recent_objects_hook_requires_execution_authorization
+    git::git_write::prepared_add::tests::disabled_fsmonitor_spellings_match_host_git
+    git::git_write::prepared_add::tests::discovery_and_mutation_share_command_budget
+    git::git_write::prepared_add::tests::discovery_defers_auxiliary_reads_until_separate_admission
+    git::git_write::prepared_add::tests::exact_approved_plan_stages_selected_file
+    git::git_write::prepared_add::tests::git_command_evidence_is_final_bound_and_redacted
+    git::git_write::prepared_add::tests::git_configuration_path_discovery_includes_absent_global_candidates
+    git::git_write::prepared_add::tests::included_config_preserves_mixed_duplicate_values
+    git::git_write::prepared_add::tests::local_push_receiver_requires_path_admission_without_receiver_reads
+    git::git_write::prepared_add::tests::mutation_refuses_auxiliary_replacement_after_discovery
+    git::git_write::prepared_add::tests::prepared_add_preserves_unrelated_staged_and_unstaged_content
+    git::git_write::prepared_add::tests::prepared_push_transfers_objects_to_admitted_git_daemon
+    git::git_write::prepared_add::tests::prepared_push_transfers_objects_with_explicit_sideband_disabled
+    git::git_write::prepared_add::tests::pull_command::native_command_refuses_configuration_drift_before_fetch
+    git::git_write::prepared_add::tests::push_discovery_binds_rewritten_destinations_and_requires_fresh_admission
+    git::git_write::prepared_add::tests::push_program_rebind_preserves_sender_effects_without_receiver_reads
+    git::git_write::prepared_add::tests::push_program_rebind_rejects_changed_destination_plan
+    git::git_write::prepared_add::tests::push_rejects_legacy_destination_inserted_after_discovery
+    git::git_write::prepared_add::tests::push_rejects_sender_ref_changes_after_discovery
+    git::git_write::prepared_add::tests::push_rejects_symbolic_and_detached_head_changes_after_discovery
+    git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked
+    git::git_write::prepared_add::tests::real_commit_runs_configured_automatic_maintenance
+    git::git_write::prepared_add::tests::receiver_child_requires_read_admission_before_capture
+    git::git_write::prepared_add::tests::receiver_home_includes_refuse_ambiguous_interpolation
+    git::git_write::prepared_add::tests::receiver_layout_stages_accept_real_bare_normal_and_linked_repositories
+    git::git_write::prepared_add::tests::receiver_metadata_stage_rejects_changed_root_marker
+    git::git_write::prepared_add::tests::receiver_metadata_wave_defers_pointer_targets_and_binds_changes
+    git::git_write::prepared_add::tests::receiver_multiple_destinations_keep_sibling_bisect_evidence_separate
+    git::git_write::prepared_add::tests::receiver_reference_tree_refuses_exact_paths_without_closed_capability
+    git::git_write::prepared_add::tests::receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof
+    git::git_write::prepared_add::tests::receiver_shell_selection_probe_rejects_stale_spelling
+    git::git_write::prepared_add::tests::receiver_skiplist_requires_target_read_and_retains_leaf_identity
+    git::git_write::prepared_add::tests::receiver_windows_shell_noninteractive_command_does_not_source_home_startup
+    git::git_write::prepared_add::tests::rerere_refuses_active_records_but_preserves_inert_and_disabled_configurations
+    git::git_write::prepared_add::tests::retained_push_refuses_changed_invocation_before_transport
+    git::git_write::prepared_add::tests::sender_program_binding_keeps_each_native_command_frozen
+    git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget
+    git::git_write::prepared_add::tests::windows_receiver_command_executes_special_path_without_shell_injection
+    git::git_write::remote_state::empty_generated_push_alias_resets_previous_destinations_like_git
+    git::git_write::remote_state::rewritten_push_destinations_match_host_without_network
+    git::git_write::target_config::tests::host_root_order_and_worktree_selection_match_native_git
+    git::git_write::target_config::tests::tracking_overlay_matches_native_checkout_section_order_and_duplicates
+
+test result: FAILED. 292 passed; 80 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.82s
+
+error: test failed, to rerun pass `-p talos-tools --lib`
