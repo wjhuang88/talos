@@ -1,6 +1,6 @@
 # SEARCH-001-D2-T3: Offline MCP Search Observation Fixtures
 
-**Status**: In Progress / Claimed PROPOSED — effective only on governance PR #1016 merge
+**Status**: In Progress / Claimed — effective #1016; partial implementation checkpoint
 
 | Field | Value |
 |---|---|
@@ -42,3 +42,9 @@
 I331/D2.2 and D2.1 are terminal source-only evidence; do not repeat or reopen. #848 and #624 remain Open. Exa/Parallel remain NOT ADMITTED; live acquisition, default activation, supplier access/output rights, true mainland-China/comparator validation, E/F/G/I and billing are excluded. No result-rights or region assertions. Historical #644 ZERO-ADMISSION unchanged.
 
 Required reads: AGENTS.md; docs/sop/AGENT-COLLABORATION.md; docs/sop/START-ITERATION.md; ADR-085/090; parent D2 owner; docs/reference/SEARCH-001-D2-HOSTED-MCP-RIGHTS-DELTA-2026-11-18.md; scripts/search_provider_observation.py; crates/talos-mcp/src/client/{transport,facade}.rs.
+
+## Execution checkpoint — 2026-11-24 (Partial)
+
+Claim #1016 became effective on main at `9eee120a23cc446413a3db2e829f201b2aace7b0` after exact-head [CI](https://github.com/wjhuang88/talos/actions/runs/45310451699) (4 applicable jobs passed, 4 scoped skips) and independent [APPROVE](https://github.com/wjhuang88/talos/pull/1016#issuecomment-7119927117). I336 is now effective under separate #1014; no overlap. Stage checkpoint `9e67dde80a7bb93d57735c9d6f6c577c1cb450cf` on `test/i337-mcp-offline-observation` preserves the locally tested research-only Python standard-library fixture companion, following I294 operator tooling convention. This is not a second production MCP stack and not a replacement for actual Rust client validation.
+
+Local `python3 -m unittest -v test_search_mcp_offline_observation` from the scripts directory: **4 test methods passed**, including 50 provider/scenario subtests (25 each Exa/Parallel) and proxy, duplicate/boolean ID, invalid metadata checks. Local and remote script/test Git blob IDs matched exactly (`d2374fef50a595a3ae82f6ef8f3a9a89dfa6bcad`, `f14cf36c662f0ccbd99c62f1206a7180f4f84ab5`). Actual HTTP only on private IPv4 loopback; synthetic JSON/SSE and input/output shapes; fixed tool identities, no external network, redirects rejected, capped response, no credential or raw query/result in evidence. TLS/proxy failures are injected labels; cancellation and deadline are pre-call simulations, not real concurrent transport cancellation. No Rust workspace/CI evidence for this checkpoint: local environment lacks cargo and cannot clone the remote. No implementation PR yet; keep In Progress / Claimed, not Complete. Remaining: converge actual `talos-mcp` reuse tests and any required bounds/strict-schema evidence, test-only integration, independent security review, exact-head native CI, source and owner-first closure. Do not assert vendor wire compatibility or production admission.
