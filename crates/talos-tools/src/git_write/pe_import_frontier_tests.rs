@@ -120,12 +120,21 @@ fn directory(
     }
     let data = at_rva(bytes, sections, rva)?;
     let table = data.get(..size).ok_or(PeError::Malformed)?;
-    if size % stride != 0 {
-        return Err(PeError::Malformed);
-    }
+    // PE ordinary imports can declare a span covering more than the
+    // descriptor array (e.g. GNU BFD's .idata directory). A referenced,
+    // file-backed lookup/address table or DLL name bounds the descriptor
+    // prefix. It is not another descriptor, nor proof of loader identity.
+    let mut descriptor_limit = size;
     for (index, descriptor) in table.chunks_exact(stride).enumerate() {
+        let descriptor_end = (index + 1) * stride;
+        if descriptor_end > descriptor_limit {
+            return Err(PeError::Malformed);
+        }
         if descriptor.iter().all(|byte| *byte == 0) {
-            let trailing = &table[(index + 1) * stride..];
+            if descriptor_limit == size && !size.is_multiple_of(stride) {
+                return Err(PeError::Malformed);
+            }
+            let trailing = &table[descriptor_end..descriptor_limit];
             if trailing.iter().any(|byte| *byte != 0) {
                 return Err(PeError::Malformed);
             }
@@ -143,6 +152,27 @@ fn directory(
             return Err(PeError::Malformed);
         }
         names.insert(dll_name(bytes, sections, name_rva)?);
+        if !delayed {
+            for (field, minimum) in [(0, 8), (16, 8), (12, 1)] {
+                let referenced = read_u32(descriptor, field)?;
+                if referenced == 0 {
+                    continue;
+                }
+                if let Some(delta) = referenced.checked_sub(rva) {
+                    let delta = delta as usize;
+                    if delta < size {
+                        let data = at_rva(bytes, sections, referenced)?;
+                        if data.len() < minimum {
+                            return Err(PeError::Malformed);
+                        }
+                        descriptor_limit = descriptor_limit.min(delta);
+                    }
+                }
+            }
+            if descriptor_end > descriptor_limit {
+                return Err(PeError::Malformed);
+            }
+        }
     }
     Err(PeError::Malformed)
 }
@@ -447,6 +477,38 @@ fn pe_import_frontier_rejects_trailing_descriptors_and_partial_entries() {
         assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
         bytes[after_terminator] = 1;
         assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+    }
+}
+
+#[test]
+fn pe_import_frontier_distinguishes_gnu_idata_payload_from_descriptors() {
+    let mut bytes = fixture();
+    // A section-sized import directory includes the lookup/address data
+    // and DLL name, not just the null-terminated descriptor prefix.
+    put32(&mut bytes, 0x98 + 124, 0x10d);
+    put32(&mut bytes, 0x98 + 216, 0);
+    put32(&mut bytes, 0x98 + 220, 0);
+    bytes[0x280..0x2c0].fill(0);
+    put32(&mut bytes, 0x200, 0x1040);
+    put32(&mut bytes, 0x210, 0x1060);
+    put32(&mut bytes, 0x240, 0x1100);
+    put32(&mut bytes, 0x260, 0x1100);
+    let imports = declared_imports(&bytes).expect("descriptor prefix and referenced payload");
+    assert_eq!(imports.ordinary, BTreeSet::from(["kernel32.dll".into()]));
+    assert!(imports.delayed.is_empty());
+
+    // Unreferenced nonzero bytes before the first referenced payload
+    // still refuse, even in a section-sized ordinary import directory.
+    let mut gap = bytes.clone();
+    gap[0x228] = 1;
+    assert_eq!(declared_imports(&gap), Err(PeError::Malformed));
+
+    // A payload reference cannot shorten the array into a descriptor
+    // or its required terminator.
+    for rva in [0x1004, 0x1014, 0x1020] {
+        let mut overlap = bytes.clone();
+        put32(&mut overlap, 0x200, rva);
+        assert_eq!(declared_imports(&overlap), Err(PeError::Malformed));
     }
 }
 
