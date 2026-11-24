@@ -120,8 +120,15 @@ fn directory(
     }
     let data = at_rva(bytes, sections, rva)?;
     let table = data.get(..size).ok_or(PeError::Malformed)?;
+    if size % stride != 0 {
+        return Err(PeError::Malformed);
+    }
     for (index, descriptor) in table.chunks_exact(stride).enumerate() {
         if descriptor.iter().all(|byte| *byte == 0) {
+            let trailing = &table[(index + 1) * stride..];
+            if trailing.iter().any(|byte| *byte != 0) {
+                return Err(PeError::Malformed);
+            }
             return Ok(names);
         }
         if index >= MAX_IMPORTS {
@@ -389,7 +396,11 @@ fn pe_import_frontier_enforces_descriptor_count_with_duplicate_names() {
                 if delayed {
                     put32(&mut bytes, descriptor, 1);
                 }
-                put32(&mut bytes, descriptor + if delayed { 4 } else { 12 }, 0x3d00);
+                put32(
+                    &mut bytes,
+                    descriptor + if delayed { 4 } else { 12 },
+                    0x3d00,
+                );
             }
             bytes[0x2f00..0x2f0a].copy_from_slice(b"later.dll\0");
             let result = declared_imports(&bytes);
@@ -405,6 +416,37 @@ fn pe_import_frontier_enforces_descriptor_count_with_duplicate_names() {
                 assert_eq!(result, Err(PeError::Budget));
             }
         }
+    }
+}
+
+#[test]
+fn pe_import_frontier_rejects_trailing_descriptors_and_partial_entries() {
+    for delayed in [false, true] {
+        let stride = if delayed { 32 } else { 20 };
+        let offset = if delayed { 220 } else { 124 };
+        let raw_start = if delayed { 0x280 } else { 0x200 };
+        let after_terminator = raw_start + stride * 2;
+        // Extra complete zero descriptors are harmless padding.
+        let mut bytes = fixture();
+        put32(&mut bytes, 0x98 + offset, (stride * 3) as u32);
+        assert!(declared_imports(&bytes).is_ok());
+        // A well-formed-looking descriptor after the terminator is ambiguous.
+        if delayed {
+            put32(&mut bytes, after_terminator, 1);
+        }
+        put32(
+            &mut bytes,
+            after_terminator + if delayed { 4 } else { 12 },
+            if delayed { 0x1120 } else { 0x1100 },
+        );
+        assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+
+        // Partial descriptors are rejected even when their bytes are zero.
+        let mut bytes = fixture();
+        put32(&mut bytes, 0x98 + offset, (stride * 2 + 1) as u32);
+        assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+        bytes[after_terminator] = 1;
+        assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
     }
 }
 
