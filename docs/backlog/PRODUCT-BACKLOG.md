@@ -1,3 +1,7 @@
+## SEARCH-001-D2-T3 / I337 / #1015 — proposed offline MCP evidence harness
+
+[Owner](active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](../iterations/I337-search-mcp-offline-observation.md): In Progress / Claimed PROPOSED #1016, only effective on merge. Offline synthetic Exa/Parallel search protocol fixtures, bounded replay metadata and negative tests; no vendor access, default activation or rights claim. Parent #848/#624 remain Open; I331 closed.
+
 ## GIT-ENV-001 / #1004 — Scoop Git environment admission
 
 Complete / Closed via #1007, f4eb947c. [Story, acceptance and required reads](active/GIT-ENV-001-scoop-install-root.md).

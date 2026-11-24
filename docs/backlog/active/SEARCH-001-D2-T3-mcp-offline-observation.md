@@ -1,6 +1,6 @@
 # SEARCH-001-D2-T3: Offline MCP Search Observation Fixtures
 
-**Status**: Ready / Unclaimed — draft intake only
+**Status**: In Progress / Claimed PROPOSED — effective only on governance PR #1016 merge
 
 | Field | Value |
 |---|---|
@@ -8,22 +8,22 @@
 | Parent | [SEARCH-001-D2 / #848](SEARCH-001-D2-keyless-mcp-admission.md) |
 | Epic | [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md) |
 | Source Issue | [#1015](https://github.com/wjhuang88/talos/issues/1015) |
-| Selected Iteration | [I337](../../iterations/I337-search-mcp-offline-observation.md), proposed only |
+| Selected Iteration | [I337](../../iterations/I337-search-mcp-offline-observation.md), proposed atomic activation via #1016 |
 | Prior evidence | [D2.2 / I331](../../iterations/I331-search-keyless-mcp-rights-evidence.md), Complete / Closed |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6.2 |
 | Work Slice | D2-T3 / #1015: offline synthetic MCP search observation and replay only; no external query, runtime backend, provider admission or permission changes |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-24 |
 | Source Issue | #1015 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer technical direction 2026-11-23; independent review and applicable exact-head checks required before activation |
+| Governance Claim PR | #1016 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer authorizes Talos-side engineering, 2026-11-23; proposed #1016 requires independent technical review, exact-head applicable CI and both governance validators, merge CAS. Single maintainer; no supplier rights granted. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-24 |
 | Handoff / Release Condition | No implementation before finalized claim merge; owner-first closure requires tested existing implementation commit; #848 remains open |

@@ -1,3 +1,7 @@
+## SEARCH-001-D2-T3 / I337 — proposed offline MCP evidence harness
+
+[Owner](backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](iterations/I337-search-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): In Progress / Claimed PROPOSED via [#1016](https://github.com/wjhuang88/talos/pull/1016), ineffective until merge. Offline-only synthetic search protocol/replay, no external vendor calls, default routing or new provider. I331 documentary slice remains closed; #848/#624 stay open for admission and real-region evidence.
+
 ## GIT-ENV-001 / #1004 — Scoop Git environment admission
 
 [Owner](backlog/active/GIT-ENV-001-scoop-install-root.md). Complete / Closed via #1007, f4eb947c. Git 2.36.1 query support remains with #919.

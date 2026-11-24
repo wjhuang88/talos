@@ -1,6 +1,6 @@
 # Iteration I337: Offline Search MCP Observation and Replay
 
-> Document status: Planned
+> Document status: Active / Claimed PROPOSED — ineffective until #1016 merges
 > Published plan date: 2026-11-24
 > Planned objective: implement bounded offline-only evidence infrastructure for #1015.
 > MVP deliverable: deterministic local synthetic Exa/Parallel search protocol tests and sanitized replay metadata.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6.2 |
 | Work Slice | D2-T3 / #1015: offline synthetic MCP search observation and replay only; no external query, runtime backend, provider admission or permission changes |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-24 |
 | Source Issue | #1015 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer technical direction 2026-11-23; independent review and applicable exact-head checks required before activation |
+| Governance Claim PR | #1016 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer authorizes Talos-side engineering, 2026-11-23; proposed #1016 requires independent technical review, exact-head applicable CI and both governance validators, merge CAS. Single maintainer; no supplier rights granted. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-24 |
 | Handoff / Release Condition | No implementation before finalized claim merge; owner-first closure requires tested existing implementation commit; #848 remains open |
@@ -48,7 +48,7 @@ I335/#1001 and I333/#991, I331/#848 documentary slice, I332 Bedrock and I330 sto
 
 ## Actual activation
 
-Proposed only; no effective claim or implementation until governance-only PR merges.
+Proposed atomic claim and activation via #1016. No effective claim or implementation until the finalized governance-only PR is independently reviewed, validated and merged. I337 distinct from I336 reserved by #1014; earlier documentary and Bing slices remain closed.
 
 ## Verification and residuals
 
