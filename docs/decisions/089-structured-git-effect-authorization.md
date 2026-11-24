@@ -918,37 +918,45 @@ system Git mutation. Push shell remains a separately reviewed effect.
    hash the already captured admitted bytes, not a fresh unapproved file
    read. Neither a version string nor a layout alone constitutes a match.
    No second rebinding or new subprocess probe is authorized.
-2. #1017 measured cmd/git.exe and mingw64/bin/git.exe, but the production
-   rebound command is mingw64/libexec/git-core/git.exe. The selected-only
-   hosted fixture must establish the actual third image receipt, root
-   equivalence and observed startup modules. An image/module snapshot in
-   a disposable package is not proof of an arbitrary installed writer or
-   a complete dependency closure; a later module or path change remains
-   relevant. Do not publish a profile from a receipt that does not measure
-   the actual rebound image. Unknown profile refuses only the replacement.
-3. **Explicit trust decision requested:** can the existing admitted native
-   process / trusted OS-loader boundary be retained for this narrowly scoped
-   source equivalence (the same boundary as the already accepted fixed
-   inspections and final execution), provided the exact actual native image,
-   invocation layout and admitted source dependencies are bound? Or must
-   I324 additionally enforce package DLL/import/delay-load/search-path
-   identity before the replacement? The review must state which model is
-   acceptable and why it cannot cause omitted attribute/configuration reads.
-   The proposed strict default until that disposition is Unsupported. A
-   module snapshot, a DLL basename allowlist, a checksum of an outer shim,
-   ambient PATH, or a package prefix alone must never be interpreted as
-   proof of module identity. If additional loader enforcement is required,
-   name the exact pre-spawn evidence, admitted paths, absence/search-order
-   witnesses, TOCTOU limits and existing safe APIs; do not silently introduce
-   unsafe or an unbounded directory scan. No relaxation is proposed by default.
+2. #1017 measured cmd/git.exe and mingw64/bin/git.exe; production
+   rebound nomination is mingw64/libexec/git-core/git.exe. CI #4604
+   (head b5033d947c7d1979420cfb531310574fb9441ea5) proved the pinned
+   MinGit 2.36.1 package **does not contain that internal executable**.
+   PortableGit was not reached. Preserve this negative receipt; the revised
+   oracle classifies absence as Unsupported for that layout and separately
+   labels source-only observations on bin/git.exe. It must not create an
+   artificial copy, infer a Scoop result or call the bin image a rebound
+   writer. Existing production migration stays unchanged. A later candidate
+   for separately admitted direct native bin invocation, if needed, must
+   explicitly review selection equivalence, invocation spelling, original
+   writer intent, exact Read/Execute facets, no silent fallback, and final
+   command binding before use.
+3. **D1 proposed choice after independent REQUEST CHANGES:** do not rely on
+   an admitted EXE plus an unqualified OS-loader assumption for source
+   equivalence. Require independently trusted pre-spawn evidence for the
+   actual native EXE and relevant complete dependency/search-path closure,
+   including loader ordering, imports/delay loads, exact paths and absence
+   witnesses, and change prevention/revalidation up to spawn. A post-spawn
+   module list or hash of a module pathname is not binding to mapped bytes,
+   a complete dependency closure or proof against later loads. Neither the
+   fixture nor existing admitted native process model supplies this stronger
+   attestation today. Do not grant a new filesystem traversal or process
+   inspection capability, introduce unsafe or weaken existing admission.
+   Until a reviewed concrete implementation can supply that evidence using
+   bounded permitted APIs, this compatibility replacement stays Unsupported.
+   Existing supported fixed CLI inspections are not subject to a new general
+   attestation prerequisite. The decision is proposed, not accepted.
 4. With a separately accepted source basis, name only the profile's exact
    relative compiled roots against the bound native invocation layout.
    Derive XDG/HOME roots from the frozen environment according to the verified
    writer semantics; ambiguous/missing environment or unproven startup
    defaults refuse. Preserve system -> XDG -> HOME config order, global
    attributes fallback, any additional actual platform config origin
-   (including Windows startup/ProgramData inputs if relevant), explicit
-   absent and empty paths, includes and conditional includes. Do not discard
+   (including Windows startup/ProgramData and known-folder inputs if relevant),
+   explicit absent and empty paths, includes and conditional includes. An
+   environment-redirection ProgramData marker observation is not proof that
+   Windows known-folder resolution is redirected or absent; uncertain sources
+   refuse, even if the marker is not observed. Do not discard
    an observed `--show-origin` source merely because it is absent from
    the profile. Origin output alone cannot prove absent/empty entrypoints.
 5. Lexical path nomination performs no file open, stat, readlink, child
