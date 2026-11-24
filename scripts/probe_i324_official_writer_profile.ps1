@@ -153,9 +153,29 @@ try {
         }
     }
 
+    # The older distribution may omit the internal executable entirely.
+    # Absence is a classified negative fixture result, NOT a usable profile.
+    # Never copy the bin image into libexec or silently substitute it.
+    if ($SelectedWriterOnly) {
+        $native = Join-Path $install 'mingw64/bin/git.exe'
+        if (-not [IO.File]::Exists($native)) { throw 'Required native bin image missing.' }
+        $reported = (Invoke-Oracle $native @('--exec-path') @{GIT_CONFIG_NOSYSTEM='1'; GIT_CONFIG_GLOBAL=(Join-Path $root 'missing-global')}).Trim()
+        $expected = Join-Path $install 'mingw64/libexec/git-core'
+        if (-not [IO.Path]::GetFullPath($reported).Equals([IO.Path]::GetFullPath($expected), [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Unexpected native bin exec-path; no classification.'
+        }
+        if (-not [IO.File]::Exists((Join-Path $expected 'git.exe'))) {
+            Write-Output "I324_SELECTED_IMAGE package=$Package image=mingw64/libexec/git-core/git.exe result=absent"
+            Write-Output "I324_SELECTED_PROFILE package=$Package result=unsupported reason=missing-rebound-image"
+            # Run only source-completeness observations on the explicitly
+            # labeled native bin; do not claim it is the rebound writer.
+            $sourceOnly = $true
+        } else { $sourceOnly = $false }
+    } else { $sourceOnly = $false }
+
     $roots = @('etc','mingw64/etc')
-    $images = if ($SelectedWriterOnly) { @('mingw64/libexec/git-core/git.exe') } else { @('cmd/git.exe','mingw64/bin/git.exe') }
-    $receiptImages = if ($SelectedWriterOnly) { @($images) + @('mingw64/bin/git.exe') } else { $images + @('usr/bin/sh.exe') }
+    $images = if ($sourceOnly) { @('mingw64/bin/git.exe') } elseif ($SelectedWriterOnly) { @('mingw64/libexec/git-core/git.exe') } else { @('cmd/git.exe','mingw64/bin/git.exe') }
+    $receiptImages = if ($SelectedWriterOnly -and -not $sourceOnly) { @($images) + @('mingw64/bin/git.exe') } elseif ($sourceOnly) { @($images) } else { $images + @('usr/bin/sh.exe') }
     foreach ($relative in $receiptImages) {
         $exe = Join-Path $install $relative
         if ([IO.File]::Exists($exe)) {
@@ -184,7 +204,7 @@ try {
             Write-Fixture (Join-Path $dir 'gitattributes') ("i324-fixture.txt filter=$marker" + [Environment]::NewLine)
         }
         [void](Invoke-Oracle $exe @('init','-q') $isolatedGlobal)
-        if ($SelectedWriterOnly) {
+        if ($SelectedWriterOnly -and -not $sourceOnly) {
             $selectedHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
             $binHash = (Get-FileHash -LiteralPath (Join-Path $install 'mingw64/bin/git.exe') -Algorithm SHA256).Hash
             Write-Output "I324_SELECTED_IMAGE package=$Package same_as_bin=$($selectedHash -ceq $binHash)"
@@ -220,10 +240,51 @@ try {
         Assert-Equal ($order -join ',') 'xdg,home' 'global-order'
         Assert-Equal ((Invoke-Oracle $exe @('check-attr','filter','--','i324-fixture.txt') @{GIT_ATTR_NOSYSTEM='1';GIT_CONFIG_NOSYSTEM='1'}).Trim()) 'i324-fixture.txt: filter: xdg' 'global-attributes'
         Assert-Equal ((Invoke-Oracle $exe @('check-attr','filter','--','i324-fixture.txt') @{GIT_ATTR_NOSYSTEM='1';GIT_CONFIG_NOSYSTEM='1';XDG_CONFIG_HOME='' }).Trim()) 'i324-fixture.txt: filter: homefallback' 'home-attributes'
+        if ($SelectedWriterOnly) {
+            # Test both global config entrypoints independently, including
+            # empty and absent files; no host config is modified.
+            $homeCfg = Join-Path $isolatedHome '.gitconfig'
+            $xdgCfg = Join-Path $xdg 'git/config'
+            $fallbackCfg = Join-Path $isolatedHome '.config/git/config'
+            foreach ($case in @('xdg-empty','xdg-missing','home-empty','home-missing')) {
+                Write-Fixture $homeCfg "[i324]`n    profile = home"
+                Write-Fixture $xdgCfg "[i324]`n    profile = xdg"
+                $path = if ($case.StartsWith('xdg-')) { $xdgCfg } else { $homeCfg }
+                if ($case.EndsWith('-empty')) { Write-Fixture $path '' }
+                else { Remove-Item -LiteralPath $path -Force }
+                $remaining = if ($case.StartsWith('xdg-')) { 'home' } else { 'xdg' }
+                $values = (Invoke-Oracle $exe @('config','--get-all','i324.profile') @{GIT_CONFIG_NOSYSTEM='1'}).Trim()
+                Assert-Equal $values $remaining $case
+                Write-Output "I324_GLOBAL_CONFIG package=$Package image=$image case=$case result=pass"
+            }
+            Write-Fixture $homeCfg "[i324]`n    profile = home"
+            Write-Fixture $xdgCfg "[i324]`n    profile = xdg"
+            Write-Fixture $fallbackCfg "[i324]`n    profile = homefallback"
+            $fallback = (Invoke-Oracle $exe @('config','--get-all','i324.profile') @{GIT_CONFIG_NOSYSTEM='1';XDG_CONFIG_HOME='' }).Trim() -split '\r?\n'
+            Assert-Equal ($fallback -join ',') 'homefallback,home' 'global-config-home-fallback'
+            Remove-Item -LiteralPath $fallbackCfg -Force
+
+            # Probe the environment-selected ProgramData candidate. A negative
+            # result does not rule out Windows known-folder or other host roots.
+            $pd = Join-Path $programData 'Git'
+            [IO.Directory]::CreateDirectory($pd) | Out-Null
+            $pdCfg = Join-Path $pd 'config'
+            Write-Fixture $pdCfg "[i324]`n    programdata = fixture-marker"
+            $all = Invoke-Oracle $exe @('config','--show-origin','--null','--list','--includes')
+            $observed = $all.Contains("i324.programdata`nfixture-marker")
+            Write-Output "I324_PROGRAMDATA package=$Package image=$image env_candidate_observed=$observed known_folder_not_proven=true"
+            Remove-Item -LiteralPath $pdCfg -Force
+            $all = Invoke-Oracle $exe @('config','--show-origin','--null','--list','--includes')
+            if ($all.Contains("i324.programdata`nfixture-marker")) { throw 'Removed ProgramData marker still observed.' }
+        }
         Remove-Item -LiteralPath (Join-Path $isolatedHome '.gitconfig'),(Join-Path $xdg 'git/config'),(Join-Path $xdg 'git/attributes'),(Join-Path $isolatedHome '.config/git/attributes') -Force
         Write-Output "I324_PACKAGE_GLOBALS package=$Package image=$image order=xdg,home attributes=pass"
     }
-    Write-Output "I324_PACKAGE_PROFILE package=$Package archive_sha256=$($receipt.Sha) result=observed"
+    if ($sourceOnly) {
+        Write-Output "I324_PACKAGE_PROFILE package=$Package archive_sha256=$($receipt.Sha) result=source-observed-only rebound=absent"
+    } else {
+        Write-Output "I324_PACKAGE_PROFILE package=$Package archive_sha256=$($receipt.Sha) result=observed"
+    }
 } finally {
     $cleanupRoot = [IO.Path]::GetFullPath($root)
     $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')
