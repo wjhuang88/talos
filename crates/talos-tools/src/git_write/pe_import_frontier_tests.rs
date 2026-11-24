@@ -79,12 +79,11 @@ fn dll_name(bytes: &[u8], sections: &[Section], rva: u32) -> Result<String> {
         .position(|byte| *byte == 0)
         .ok_or(PeError::Malformed)?;
     let name = &prefix[..end];
-    // Narrow ordinary basename grammar only. Do not interpret a path, ADS,
-    // device name, Unicode alias, or arbitrary import string as a file path.
+    // Narrow ordinary basename grammar only. No name is a path or authority.
     if name.len() <= 4
         || !name
             .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'_' | b'.'))
         || name.starts_with(b".")
         || name.windows(2).any(|pair| pair == b"..")
     {
@@ -115,14 +114,17 @@ fn directory(
     }
     let stride = if delayed { 32 } else { 20 };
     let size = size as usize;
-    if size / stride > MAX_IMPORTS + 1 {
+    if size > 1024 * 1024 {
         return Err(PeError::Budget);
     }
     let data = at_rva(bytes, sections, rva)?;
     let table = data.get(..size).ok_or(PeError::Malformed)?;
-    for descriptor in table.chunks_exact(stride) {
+    for (index, descriptor) in table.chunks_exact(stride).enumerate() {
         if descriptor.iter().all(|byte| *byte == 0) {
             return Ok(names);
+        }
+        if index >= MAX_IMPORTS {
+            return Err(PeError::Budget);
         }
         if delayed && read_u32(descriptor, 0)? != 1 {
             // Only RVA-based delay imports are understood.
@@ -169,12 +171,10 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
     if directory_count < 14 || directory_count > (optional_size - 112) / 8 {
         return Err(PeError::Unsupported);
     }
-    let mut sections = Vec::with_capacity(count);
+    let mut sections: Vec<Section> = Vec::with_capacity(count);
     for index in 0..count {
         let offset = section_table + index * 40;
-        bytes
-            .get(offset..offset + 40)
-            .ok_or(PeError::Malformed)?;
+        bytes.get(offset..offset + 40).ok_or(PeError::Malformed)?;
         let section = Section {
             virtual_size: read_u32(bytes, offset + 8)?,
             rva: read_u32(bytes, offset + 12)?,
@@ -185,7 +185,8 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
             .raw_start
             .checked_add(section.raw_size as usize)
             .ok_or(PeError::Malformed)?;
-        if end > bytes.len() || (section.raw_size != 0 && section.raw_start < section_table + count * 40)
+        if end > bytes.len()
+            || (section.raw_size != 0 && section.raw_start < section_table + count * 40)
         {
             return Err(PeError::Malformed);
         }
@@ -194,7 +195,6 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
             .checked_add(section.virtual_size.max(section.raw_size))
             .ok_or(PeError::Malformed)?;
         for previous in &sections {
-            let previous: &Section = previous;
             let previous_end = previous.rva + previous.virtual_size.max(previous.raw_size);
             let previous_raw_end = previous.raw_start + previous.raw_size as usize;
             if (section.rva < previous_end && previous.rva < virtual_end)
@@ -303,6 +303,28 @@ fn pe_import_frontier_refuses_ambiguous_sections_and_excess_descriptors() {
     bytes.copy_within(first..first + 40, first + 40);
     assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
     let mut bytes = fixture();
-    put32(&mut bytes, 0x98 + 124, 20 * 258);
+    put32(&mut bytes, 0x98 + 124, 1024 * 1024 + 1);
     assert_eq!(declared_imports(&bytes), Err(PeError::Budget));
+}
+
+#[test]
+fn pe_import_frontier_refuses_unterminated_names_and_virtual_tail() {
+    let mut bytes = fixture();
+    bytes[0x300..0x381].fill(b'a');
+    assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+    let mut bytes = fixture();
+    put32(&mut bytes, 0x98 + 240 + 8, 0x100);
+    assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+}
+
+#[test]
+fn pe_import_frontier_empty_directories_do_not_imply_loader_safety() {
+    let mut bytes = fixture();
+    for offset in [120, 124, 216, 220] {
+        put32(&mut bytes, 0x98 + offset, 0);
+    }
+    let imports = declared_imports(&bytes).expect("no declared imports");
+    assert!(imports.ordinary.is_empty());
+    assert!(imports.delayed.is_empty());
+    // No return type from this parser can establish trusted load identity.
 }
