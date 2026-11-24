@@ -1,5 +1,5 @@
 # I324 test-only official Git package oracle; never point at an installed Git.
-param([ValidateSet('MinGit','PortableGit')][string]$Package = 'MinGit')
+param([ValidateSet('MinGit','PortableGit')][string]$Package = 'MinGit', [switch]$SelectedWriterOnly)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Native Windows PowerShell 7 required.' }
@@ -77,9 +77,86 @@ try {
     function Assert-Equal([string]$Actual,[string]$Expected,[string]$Case) {
         if ($Actual -cne $Expected) { throw "I324 profile mismatch case=$Case; output withheld." }
     }
+    # Observe the actual rebound sender in the same spelling used by
+    # prepared_add::request_sender_program. This is a fixture observation,
+    # not a complete loader manifest or a production attestation.
+    function Observe-SelectedModules([string]$Executable) {
+        $start = [Diagnostics.ProcessStartInfo]::new()
+        $start.FileName = $Executable
+        $start.WorkingDirectory = $fixture
+        $start.UseShellExecute = $false
+        $start.CreateNoWindow = $true
+        $start.RedirectStandardInput = $true
+        $start.RedirectStandardOutput = $true
+        $start.RedirectStandardError = $true
+        foreach ($arg in @('cat-file','--batch-check')) { [void]$start.ArgumentList.Add($arg) }
+        foreach ($key in @($start.Environment.Keys)) {
+            if ($key -like 'GIT_*') { [void]$start.Environment.Remove($key) }
+        }
+        $start.Environment['HOME'] = $isolatedHome
+        $start.Environment['USERPROFILE'] = $isolatedHome
+        $start.Environment['XDG_CONFIG_HOME'] = $xdg
+        $start.Environment['PROGRAMDATA'] = $programData
+        $start.Environment['ALLUSERSPROFILE'] = $programData
+        $start.Environment['GIT_CONFIG_NOSYSTEM'] = '1'
+        $start.Environment['GIT_CONFIG_GLOBAL'] = Join-Path $root 'missing-global'
+        $start.Environment['GIT_TERMINAL_PROMPT'] = '0'
+        $proc = [Diagnostics.Process]::new()
+        $proc.StartInfo = $start
+        $started = $false
+        try {
+            if (-not $proc.Start()) { throw 'Could not start selected writer fixture.' }
+            $started = $true
+            $stderr = $proc.StandardError.ReadToEndAsync()
+            # A completed read-only request is a handshake; the process then
+            # stays alive on stdin. No arbitrary sleep or repository mutation.
+            $missing = '0' * 40
+            $proc.StandardInput.WriteLine($missing)
+            $proc.StandardInput.Flush()
+            $line = $proc.StandardOutput.ReadLineAsync()
+            if (-not $line.Wait(5000)) { throw 'Selected writer handshake timed out.' }
+            Assert-Equal $line.Result "$missing missing" 'selected-writer-handshake'
+            $proc.Refresh()
+            if ($proc.HasExited -or -not [IO.Path]::GetFullPath($proc.MainModule.FileName).Equals(
+                [IO.Path]::GetFullPath($Executable), [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Selected writer process image mismatch.'
+            }
+            $packagePrefix = [IO.Path]::GetFullPath($install).TrimEnd('\','/') + '\'
+            $osPrefix = [IO.Path]::GetFullPath($env:SystemRoot).TrimEnd('\','/') + '\'
+            $packageCount = 0
+            $osCount = 0
+            $otherCount = 0
+            foreach ($module in @($proc.Modules)) {
+                $name = [IO.Path]::GetFullPath($module.FileName)
+                if ($name.StartsWith($packagePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                    $relative = $name.Substring($packagePrefix.Length).Replace('\','/')
+                    $hash = (Get-FileHash -LiteralPath $name -Algorithm SHA256).Hash.ToLowerInvariant()
+                    Write-Output "I324_SELECTED_MODULE package=$Package image=$relative sha256=$hash"
+                    $packageCount++
+                } elseif ($name.StartsWith($osPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                    $osCount++
+                } else {
+                    # Do not disclose arbitrary runner paths. An outside
+                    # module is explicitly NOT proven by this receipt.
+                    $otherCount++
+                }
+            }
+            if ($packageCount -lt 1) { throw 'Selected writer module inventory empty.' }
+            $proc.StandardInput.Close()
+            if (-not $proc.WaitForExit(5000)) { throw 'Selected writer did not stop.' }
+            [void]$stderr.GetAwaiter().GetResult()
+            if ($proc.ExitCode -ne 0) { throw 'Selected writer handshake process failed.' }
+            Write-Output "I324_SELECTED_MODULES package=$Package package_count=$packageCount os_count=$osCount other_count=$otherCount snapshot_only=true"
+        } finally {
+            if ($started -and -not $proc.HasExited) { $proc.Kill($true); $proc.WaitForExit() }
+            $proc.Dispose()
+        }
+    }
+
     $roots = @('etc','mingw64/etc')
-    $images = @('cmd/git.exe','mingw64/bin/git.exe')
-    foreach ($relative in $images + @('usr/bin/sh.exe')) {
+    $images = if ($SelectedWriterOnly) { @('mingw64/libexec/git-core/git.exe') } else { @('cmd/git.exe','mingw64/bin/git.exe') }
+    $receiptImages = if ($SelectedWriterOnly) { @($images) + @('mingw64/bin/git.exe') } else { $images + @('usr/bin/sh.exe') }
+    foreach ($relative in $receiptImages) {
         $exe = Join-Path $install $relative
         if ([IO.File]::Exists($exe)) {
             $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -107,6 +184,12 @@ try {
             Write-Fixture (Join-Path $dir 'gitattributes') ("i324-fixture.txt filter=$marker" + [Environment]::NewLine)
         }
         [void](Invoke-Oracle $exe @('init','-q') $isolatedGlobal)
+        if ($SelectedWriterOnly) {
+            $selectedHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
+            $binHash = (Get-FileHash -LiteralPath (Join-Path $install 'mingw64/bin/git.exe') -Algorithm SHA256).Hash
+            Write-Output "I324_SELECTED_IMAGE package=$Package same_as_bin=$($selectedHash -ceq $binHash)"
+            Observe-SelectedModules $exe
+        }
         $config = (Invoke-Oracle $exe @('config','--system','--get','i324.profile') $isolatedGlobal).Trim()
         $attr = (Invoke-Oracle $exe @('check-attr','filter','--','i324-fixture.txt') $isolatedGlobal).Trim()
         if ($config -cnotin @('root','mingw')) { throw 'Unknown compiled config root.' }
