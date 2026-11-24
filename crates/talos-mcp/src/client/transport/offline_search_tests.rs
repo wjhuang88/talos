@@ -6,6 +6,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 const MAX_FIXTURE_BODY: usize = 64 * 1024;
@@ -87,12 +88,21 @@ async fn spawn_fixture(
     fixture: Fixture,
     request_count: usize,
 ) -> (String, JoinHandle<Vec<String>>) {
+    spawn_fixture_with_control(fixture, request_count, None).await
+}
+
+async fn spawn_fixture_with_control(
+    fixture: Fixture,
+    request_count: usize,
+    cancellation: Option<(oneshot::Sender<()>, oneshot::Receiver<()>)>,
+) -> (String, JoinHandle<Vec<String>>) {
     let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
         .await
         .expect("bind IPv4 loopback fixture");
     let address = listener.local_addr().expect("read local fixture address");
     let task = tokio::spawn(async move {
         let mut methods = Vec::new();
+        let mut cancellation = cancellation;
         for _ in 0..request_count {
             let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
                 .await
@@ -134,6 +144,16 @@ async fn spawn_fixture(
                     );
                 }
                 _ => panic!("unexpected local MCP method: {method}"),
+            }
+
+            if method == "tools/list"
+                && let Some((received, release)) = cancellation.take()
+            {
+                received.send(()).expect("signal parsed tools/list request");
+                tokio::time::timeout(Duration::from_secs(2), release)
+                    .await
+                    .expect("bounded cancellation fixture release")
+                    .expect("release cancellation fixture response");
             }
 
             if method == "notifications/initialized" {
@@ -469,6 +489,25 @@ async fn pinned_exa_and_parallel_tools_roundtrip_over_json_and_sse() {
             let tools = dispatcher.list_tools().await.expect("list synthetic tools");
             assert!(only_pinned_search_tool(&tools, tool));
 
+            let forbidden_names = match tool {
+                "web_search_exa" => ["web_research", "web_fetch", "image_search", "web_search"],
+                "web_search" => [
+                    "web_research",
+                    "web_fetch",
+                    "image_search",
+                    "web_search_exa",
+                ],
+                _ => unreachable!(),
+            };
+            for forbidden_name in forbidden_names {
+                assert!(
+                    call_admitted_tool(&dispatcher, &tools, tool, forbidden_name)
+                        .await
+                        .is_none(),
+                    "unexpectedly admitted {forbidden_name} for {tool}"
+                );
+            }
+
             let result = call_admitted_tool(&dispatcher, &tools, tool, requested_name)
                 .await
                 .expect("pinned call is admitted")
@@ -633,25 +672,42 @@ async fn streamable_http_deadline_and_caller_cancellation_are_in_flight() {
     assert!(matches!(timeout_error, McpError::Http(ref error) if error.is_timeout()));
     assert_eq!(server.await.expect("fixture task"), expected_steps(3));
 
-    let mut cancellation_fixture = fixture("web_search");
-    cancellation_fixture.list_reply = Reply::Delay(Duration::from_millis(200));
-    let (url, server) = spawn_fixture(cancellation_fixture, 3).await;
+    let cancellation_fixture = fixture("web_search");
+    let (received, request_received) = oneshot::channel();
+    let (release_response, response_released) = oneshot::channel();
+    let (url, server) =
+        spawn_fixture_with_control(cancellation_fixture, 3, Some((received, response_released)))
+            .await;
     let transport = offline_transport(url);
-    let dispatcher = McpDispatcher::new("i337-synthetic".to_string(), transport.clone());
-    dispatcher
+    McpDispatcher::new("i337-synthetic".to_string(), transport.clone())
         .initialize()
         .await
         .expect("initialize local MCP fixture");
-    let cancelled = tokio::time::timeout(
-        Duration::from_millis(50),
-        transport.request("tools/list", Some(serde_json::json!({}))),
-    )
-    .await;
+    let request_transport = transport.clone();
+    let request = tokio::spawn(async move {
+        request_transport
+            .request("tools/list", Some(serde_json::json!({})))
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(2), request_received)
+        .await
+        .expect("bounded wait for parsed tools/list request")
+        .expect("fixture signaled tools/list receipt");
+    request.abort();
     assert!(
-        cancelled.is_err(),
-        "caller deadline cancels the in-flight request"
+        matches!(request.await, Err(error) if error.is_cancelled()),
+        "request future was not cancelled while awaiting its response"
     );
-    assert_eq!(server.await.expect("fixture task"), expected_steps(3));
+    release_response
+        .send(())
+        .expect("release fixture after caller cancellation");
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(3), server)
+            .await
+            .expect("bounded cancellation fixture cleanup")
+            .expect("fixture task"),
+        expected_steps(3)
+    );
 }
 
 #[tokio::test]
