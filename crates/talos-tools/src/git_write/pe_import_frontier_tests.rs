@@ -407,3 +407,26 @@ fn pe_import_frontier_enforces_descriptor_count_with_duplicate_names() {
     }
 }
 
+
+#[cfg(windows)]
+#[test]
+#[ignore = "explicit checksum-verified disposable package fixture only"]
+fn pe_import_frontier_fixture_from_file() {
+    use std::io::Read;
+
+    // Only the isolated test adapter reads an explicitly supplied fixture.
+    // The actual parser remains pure, with no ambient access.
+    let path = std::env::var_os("TALOS_I324_PE_FIXTURE").expect("fixture path");
+    let file = std::fs::File::open(path).expect("open fixture image");
+    let mut bytes = Vec::new();
+    file.take(MAX_IMAGE as u64 + 1)
+        .read_to_end(&mut bytes)
+        .expect("bounded fixture read");
+    let imports = declared_imports(&bytes).expect("declared imports in pinned fixture");
+    for name in imports.ordinary {
+        println!("I324_PE_DECLARED kind=ordinary name={name}");
+    }
+    for name in imports.delayed {
+        println!("I324_PE_DECLARED kind=delayed name={name}");
+    }
+}
