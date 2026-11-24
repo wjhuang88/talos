@@ -279,6 +279,14 @@ recorded separately. Verify exact-head CI, both governance validators, and resol
 of blocking feedback before merging with the expected head SHA. This authorization
 expires if the candidate changes and applies only to this PR.
 
+For the I338 documentation-only claim and activation in PR #1025, the sole
+maintainer authorized merging commit `8552c54aa5b395d1002f69114be0ec57da2a4818`
+after independent Agent technical/security review, both governance validators,
+exact-head CI and resolution of blocking feedback. Record the maintainer decision
+separately from the Agent review and merge with the expected head SHA. This
+authorization expires if the head changes. Subsequent I338 product changes require
+their own protected-scope review and authorization.
+
 ### Deferred Human Validation Does Not Change Merge Authorization
 
 `LONG-RUNNING-TASK.md` may schedule an owner-defined natural-person review or device/manual
