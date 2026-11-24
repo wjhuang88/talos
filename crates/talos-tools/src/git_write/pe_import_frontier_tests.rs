@@ -171,6 +171,11 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
     if directory_count < 14 || directory_count > (optional_size - 112) / 8 {
         return Err(PeError::Unsupported);
     }
+    let header_size = read_u32(bytes, optional + 60)? as usize;
+    let header_end = section_table + count * 40;
+    if header_size < header_end || header_size > bytes.len() {
+        return Err(PeError::Malformed);
+    }
     let mut sections: Vec<Section> = Vec::with_capacity(count);
     for index in 0..count {
         let offset = section_table + index * 40;
@@ -186,7 +191,9 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
             .checked_add(section.raw_size as usize)
             .ok_or(PeError::Malformed)?;
         if end > bytes.len()
-            || (section.raw_size != 0 && section.raw_start < section_table + count * 40)
+            || (section.raw_size != 0 && section.raw_start < header_size)
+            || (section.virtual_size.max(section.raw_size) != 0
+                && (section.rva as usize) < header_size)
         {
             return Err(PeError::Malformed);
         }
@@ -246,6 +253,7 @@ fn fixture() -> Vec<u8> {
     put16(&mut bytes, 0x94, 240);
     let optional = 0x98;
     put16(&mut bytes, optional, 0x20b);
+    put32(&mut bytes, optional + 60, 0x200);
     put32(&mut bytes, optional + 108, 16);
     put32(&mut bytes, optional + 120, 0x1000);
     put32(&mut bytes, optional + 124, 40);
@@ -327,4 +335,78 @@ fn pe_import_frontier_empty_directories_do_not_imply_loader_safety() {
     assert!(imports.ordinary.is_empty());
     assert!(imports.delayed.is_empty());
     // No return type from this parser can establish trusted load identity.
+}
+
+#[test]
+fn pe_import_frontier_refuses_sections_overlapping_declared_headers() {
+    let mut bytes = fixture();
+    // Section bytes still exist and contain a valid import table, but
+    // the declared headers cover part of the section's raw extent.
+    put32(&mut bytes, 0x98 + 60, 0x300);
+    assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+
+    let mut bytes = fixture();
+    // Move the virtual section and all corresponding directory/name
+    // RVAs into the header range without moving the raw fixture bytes.
+    put32(&mut bytes, 0x98 + 240 + 12, 0x100);
+    put32(&mut bytes, 0x98 + 120, 0x100);
+    put32(&mut bytes, 0x98 + 216, 0x180);
+    put32(&mut bytes, 0x20c, 0x200);
+    put32(&mut bytes, 0x284, 0x220);
+    assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+
+    for size in [0, 0x1af, 0x601] {
+        let mut bytes = fixture();
+        put32(&mut bytes, 0x98 + 60, size);
+        assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
+    }
+}
+
+#[test]
+fn pe_import_frontier_enforces_descriptor_count_with_duplicate_names() {
+    // Repeated names cannot bypass the budget through set deduplication.
+    for delayed in [false, true] {
+        for count in [MAX_IMPORTS, MAX_IMPORTS + 1] {
+            let mut bytes = fixture();
+            bytes.resize(0x3000, 0);
+            bytes[0x200..].fill(0);
+            put32(&mut bytes, 0x98 + 240 + 8, 0x2e00);
+            put32(&mut bytes, 0x98 + 240 + 16, 0x2e00);
+            for offset in [120, 124, 216, 220] {
+                put32(&mut bytes, 0x98 + offset, 0);
+            }
+            let stride = if delayed { 32 } else { 20 };
+            let directory_offset = if delayed { 216 } else { 120 };
+            put32(&mut bytes, 0x98 + directory_offset, 0x1000);
+            put32(
+                &mut bytes,
+                0x98 + directory_offset + 4,
+                ((count + 1) * stride) as u32,
+            );
+            for index in 0..count {
+                let descriptor = 0x200 + index * stride;
+                if delayed {
+                    put32(&mut bytes, descriptor, 1);
+                }
+                put32(
+                    &mut bytes,
+                    descriptor + if delayed { 4 } else { 12 },
+                    0x3d00,
+                );
+            }
+            bytes[0x2f00..0x2f0a].copy_from_slice(b"later.dll\0");
+            let result = declared_imports(&bytes);
+            if count == MAX_IMPORTS {
+                let imports = result.expect("exact descriptor budget");
+                let names = if delayed {
+                    imports.delayed
+                } else {
+                    imports.ordinary
+                };
+                assert_eq!(names, BTreeSet::from(["later.dll".into()]));
+            } else {
+                assert_eq!(result, Err(PeError::Budget));
+            }
+        }
+    }
 }
