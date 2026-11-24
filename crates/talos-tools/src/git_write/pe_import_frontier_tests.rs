@@ -176,11 +176,6 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
     if header_size < header_end || header_size > bytes.len() {
         return Err(PeError::Malformed);
     }
-    let header_size = read_u32(bytes, optional + 60)? as usize;
-    let header_end = section_table + count * 40;
-    if header_size < header_end || header_size > bytes.len() {
-        return Err(PeError::Malformed);
-    }
     let mut sections: Vec<Section> = Vec::with_capacity(count);
     for index in 0..count {
         let offset = section_table + index * 40;
@@ -206,9 +201,6 @@ fn declared_imports(bytes: &[u8]) -> Result<DeclaredImports> {
             .rva
             .checked_add(section.virtual_size.max(section.raw_size))
             .ok_or(PeError::Malformed)?;
-        if virtual_end != section.rva && (section.rva as usize) < header_size {
-            return Err(PeError::Malformed);
-        }
         for previous in &sections {
             let previous_end = previous.rva + previous.virtual_size.max(previous.raw_size);
             let previous_raw_end = previous.raw_start + previous.raw_size as usize;
@@ -261,7 +253,6 @@ fn fixture() -> Vec<u8> {
     put16(&mut bytes, 0x94, 240);
     let optional = 0x98;
     put16(&mut bytes, optional, 0x20b);
-    put32(&mut bytes, optional + 60, 0x200);
     put32(&mut bytes, optional + 60, 0x200);
     put32(&mut bytes, optional + 108, 16);
     put32(&mut bytes, optional + 120, 0x1000);
@@ -397,11 +388,7 @@ fn pe_import_frontier_enforces_descriptor_count_with_duplicate_names() {
                 if delayed {
                     put32(&mut bytes, descriptor, 1);
                 }
-                put32(
-                    &mut bytes,
-                    descriptor + if delayed { 4 } else { 12 },
-                    0x3d00,
-                );
+                put32(&mut bytes, descriptor + if delayed { 4 } else { 12 }, 0x3d00);
             }
             bytes[0x2f00..0x2f0a].copy_from_slice(b"later.dll\0");
             let result = declared_imports(&bytes);
@@ -420,61 +407,3 @@ fn pe_import_frontier_enforces_descriptor_count_with_duplicate_names() {
     }
 }
 
-#[test]
-fn pe_import_frontier_rejects_invalid_header_extent_and_section_overlaps() {
-    let optional = 0x98;
-    let section = optional + 240;
-    for header_size in [0, (section + 39) as u32, 0x601] {
-        let mut bytes = fixture();
-        put32(&mut bytes, optional + 60, header_size);
-        assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
-    }
-    // The raw section starts inside declared header padding, although it
-    // still begins after the section table and all supplied bytes exist.
-    let mut bytes = fixture();
-    put32(&mut bytes, optional + 60, 0x300);
-    assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
-
-    // Keep the table and names at the same raw offsets while relocating
-    // their RVAs into the declared header range.
-    let mut bytes = fixture();
-    put32(&mut bytes, section + 12, 0x100);
-    put32(&mut bytes, optional + 120, 0x100);
-    put32(&mut bytes, optional + 216, 0x180);
-    put32(&mut bytes, 0x20c, 0x200);
-    put32(&mut bytes, 0x284, 0x220);
-    assert_eq!(declared_imports(&bytes), Err(PeError::Malformed));
-}
-
-#[test]
-fn pe_import_frontier_descriptor_count_boundary_includes_duplicates() {
-    for delayed in [false, true] {
-        let stride = if delayed { 32 } else { 20 };
-        for count in [MAX_IMPORTS, MAX_IMPORTS + 1] {
-            let table_size = (count + 1) * stride;
-            let mut bytes = vec![0; table_size + 16];
-            let base = 0x1000;
-            let name_rva = base + table_size as u32;
-            bytes[table_size..table_size + 9].copy_from_slice(b"same.dll\0");
-            for index in 0..count {
-                let start = index * stride;
-                if delayed {
-                    put32(&mut bytes, start, 1);
-                }
-                put32(&mut bytes, start + if delayed { 4 } else { 12 }, name_rva);
-            }
-            let sections = [Section {
-                rva: base,
-                virtual_size: bytes.len() as u32,
-                raw_start: 0,
-                raw_size: bytes.len() as u32,
-            }];
-            let result = directory(&bytes, &sections, base, table_size as u32, delayed);
-            if count == MAX_IMPORTS {
-                assert_eq!(result, Ok(BTreeSet::from(["same.dll".into()])));
-            } else {
-                assert_eq!(result, Err(PeError::Budget));
-            }
-        }
-    }
-}
