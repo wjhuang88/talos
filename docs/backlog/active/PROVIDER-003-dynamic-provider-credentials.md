@@ -227,3 +227,7 @@ require separate owners or an explicit update to the decomposition before implem
 ## PROVIDER-003-A / I336
 
 Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
+
+## PROVIDER-003-B / I338
+
+[Child owner](PROVIDER-003-B-shared-credential-lifecycle.md) / [I338](../../iterations/I338-provider003b-shared-credential-lifecycle.md) / [#1024](https://github.com/wjhuang88/talos/issues/1024): #1025 proposes In Progress / Claimed shared lifecycle only, effective on main merge. ADR-108 governs; C final-request authorization/replay and D–G acquisition remain separate. Parent remains Refinement Epic / Unclaimed and #132 open. No product code in this claim.
