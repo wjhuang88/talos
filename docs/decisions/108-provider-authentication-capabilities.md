@@ -1,6 +1,6 @@
 # ADR-108: Provider authentication capabilities
 
-**Status**: Proposed for PROVIDER-003-A / I336 / #1013. Independent security review pending.
+**Status**: Accepted for PROVIDER-003-A / I336 / #1013 via #1020 under the authorization recorded in #1021.
 
 ## Existing routes
 
@@ -14,7 +14,7 @@
 
 Paths in this table are relative to crates/. The transport evidence establishes no interactive login or general credential chain.
 
-## Proposed decisions
+## Decisions
 
 B resolves an opaque credential lease for an explicit profile, account, audience and configuration generation. Keep static-key behavior as the default. Reject ambiguous explicit credential sources before network access. Store access tokens in bounded process memory; persistent refresh material requires an approved OS secret store and explicit enrollment. A headless host without that store can accept a supplied credential or return an actionable configuration error. Never fall back to writing tokens in TOML.
 

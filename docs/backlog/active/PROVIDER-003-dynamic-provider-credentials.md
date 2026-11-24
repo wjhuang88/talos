@@ -199,7 +199,7 @@ When a child implementation is selected:
 
 ## Acceptance For Epic Governance
 
-- [ ] PROVIDER-003-A owner document and ADR/threat-model review are accepted before product code.
+- [x] PROVIDER-003-A owner document and ADR/threat-model review are accepted before product code.
 - [ ] Every selected child has its own owner, collaboration claim, iteration, exact base, validation
       matrix, and residual destination.
 - [ ] Shared capability changes occur only in A/B/C and are not smuggled through a provider-specific
@@ -226,4 +226,4 @@ require separate owners or an explicit update to the decomposition before implem
 
 ## PROVIDER-003-A / I336
 
-Governance #1014 proposes activation of #1013 for the authentication capability ADR and threat model under #132. Ownership takes effect on merge.
+Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
