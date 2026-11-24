@@ -272,6 +272,13 @@ Use one of these paths:
 
 The PR author does not need to approve their own PR under the single-maintainer path.
 
+For the documentation-only ADR-108 in PR #1020, the sole maintainer authorized a
+single-maintainer merge of commit `d50941297d1cf7491a813c7f1cb9cd744929d4dd`.
+The independent Agent security review and the maintainer's merge decision must be
+recorded separately. Verify exact-head CI, both governance validators, and resolution
+of blocking feedback before merging with the expected head SHA. This authorization
+expires if the candidate changes and applies only to this PR.
+
 ### Deferred Human Validation Does Not Change Merge Authorization
 
 `LONG-RUNNING-TASK.md` may schedule an owner-defined natural-person review or device/manual

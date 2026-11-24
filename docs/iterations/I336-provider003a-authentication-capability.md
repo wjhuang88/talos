@@ -14,8 +14,8 @@
 | Claimed At | 2026-11-23 |
 | Source Issue | #1013 |
 | Governance Claim PR | #1014 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer requested work on #132. Independent review of this claim and separate security review of the ADR are required before their respective merges. |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim #1014 used independent review. For the ADR only, the sole maintainer authorized the PR #1020 exception in AGENT-COLLABORATION §3. Independent Agent security re-review passed on d50941297d1cf7491a813c7f1cb9cd744929d4dd (PR comment 7122440728). |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-23 |
 | Handoff / Release Condition | Merge the reviewed architecture deliverable and record its commit before closing #1013. |
