@@ -889,3 +889,106 @@ remaining blocker after correcting the rebound invocation/canonical distinction.
 MSVC xwin checking and the host Unix shell regression pass. This candidate does
 not prove DLL loading, MSYS startup effects or real Windows prepared Push;
 these runtime/trust limitations remain activation prerequisites.
+
+
+## I324 selected-writer source equivalence — proposed decision, not accepted
+
+**Proposed / non-operative.** Refs #919, effective I324 claim #920. This
+section is a concrete review candidate after the non-authorizing #931, #928,
+#1007 and #1017 work. No previous Accepted paragraph is superseded by publishing
+this proposal; the existing refusal for unavailable path queries remains
+effective. Independent security/API disposition and separate exact-text
+maintainer acceptance are required before a binding amendment; implementation
+and native product validation are distinct subsequent gates.
+
+### D1: Checkout/Commit only
+
+The scope is four unsupported `git var` root queries and
+`check-attr --source=<target.commit>`. Keep the supported fixed config,
+ordinary/cached attribute and exec-path inspections and the original final
+system Git mutation. Push shell remains a separately reviewed effect.
+
+1. Reuse the existing Windows sender migration in `prepared_add.rs`:
+   #1007 Scoop mapping, its exact admission and retained guards, then existing
+   `--exec-path`, independent internal executable Path Read/Command Execute,
+   `ReceiverChildExecutable::capture`, `SenderProgramBinding`,
+   `validate_internal_program` and `revalidate`. A source profile can match
+   only the **actual rebound program**, not the outer shim or launcher.
+   Verify its canonical target, invocation spelling and path identities and
+   hash the already captured admitted bytes, not a fresh unapproved file
+   read. Neither a version string nor a layout alone constitutes a match.
+   No second rebinding or new subprocess probe is authorized.
+2. #1017 measured cmd/git.exe and mingw64/bin/git.exe; production
+   rebound nomination is mingw64/libexec/git-core/git.exe. CI #4604
+   (head b5033d947c7d1979420cfb531310574fb9441ea5) proved the pinned
+   MinGit 2.36.1 package **does not contain that internal executable**.
+   PortableGit was not reached. Preserve this negative receipt; the revised
+   oracle classifies absence as Unsupported for that layout and separately
+   labels source-only observations on bin/git.exe. It must not create an
+   artificial copy, infer a Scoop result or call the bin image a rebound
+   writer. Existing production migration stays unchanged. A later candidate
+   for separately admitted direct native bin invocation, if needed, must
+   explicitly review selection equivalence, invocation spelling, original
+   writer intent, exact Read/Execute facets, no silent fallback, and final
+   command binding before use.
+3. **D1 proposed choice after independent REQUEST CHANGES:** do not rely on
+   an admitted EXE plus an unqualified OS-loader assumption for source
+   equivalence. Require independently trusted pre-spawn evidence for the
+   actual native EXE and relevant complete dependency/search-path closure,
+   including loader ordering, imports/delay loads, exact paths and absence
+   witnesses, and change prevention/revalidation up to spawn. A post-spawn
+   module list or hash of a module pathname is not binding to mapped bytes,
+   a complete dependency closure or proof against later loads. Neither the
+   fixture nor existing admitted native process model supplies this stronger
+   attestation today. Do not grant a new filesystem traversal or process
+   inspection capability, introduce unsafe or weaken existing admission.
+   Until a reviewed concrete implementation can supply that evidence using
+   bounded permitted APIs, this compatibility replacement stays Unsupported.
+   Existing supported fixed CLI inspections are not subject to a new general
+   attestation prerequisite. The decision is proposed, not accepted.
+4. With a separately accepted source basis, name only the profile's exact
+   relative compiled roots against the bound native invocation layout.
+   Derive XDG/HOME roots from the frozen environment according to the verified
+   writer semantics; ambiguous/missing environment or unproven startup
+   defaults refuse. Preserve system -> XDG -> HOME config order, global
+   attributes fallback, any additional actual platform config origin
+   (including Windows startup/ProgramData and known-folder inputs if relevant),
+   explicit absent and empty paths, includes and conditional includes. An
+   environment-redirection ProgramData marker observation is not proof that
+   Windows known-folder resolution is redirected or absent; uncertain sources
+   refuse, even if the marker is not observed. Do not discard
+   an observed `--show-origin` source merely because it is absent from
+   the profile. Origin output alone cannot prove absent/empty entrypoints.
+5. Lexical path nomination performs no file open, stat, readlink, child
+   execution or ambient environment access. Use the existing closed
+   auxiliary path-resolution capability only for its already accepted
+   semantics; an additional use requires review. Exact Path Read continuation
+   precedes any file bytes, with independently admitted ancestor/link/absence
+   evidence as applicable. Reuse the existing source capture and revalidation
+   paths, preserving path spellings, bounds and one-use continuation identity.
+   Do not reinterpret `git:configuration-chain` as filesystem authority.
+   No permission type, recursive root grant, stage-count increase or general
+   replacement permission is included in this proposal.
+6. For committed-tree attributes, use #928's supplied-byte selector only
+   after exact admitted tree/object/alternate and ancestor evidence, strict
+   OID binding, source precedence (system, global, tree ancestors, info),
+   macro/filter behavior and stale checks. Normal and cached CLI keep their
+   current behavior. No temporary index, implicit gix repository open or
+   hidden subprocess. An unsupported query classification must be specific;
+   unrelated nonzero exits, cancellation, denial and timeouts cannot trigger
+   an alternate path or bypass admission.
+
+### D2: implementation and activation
+
+After independent D1 disposition and explicit acceptance, build the concrete
+runtime path on the reviewed model; no profile or replacement is enabled by
+this proposed text. Prove exact Read/Command facets and absence/ancestor
+evidence, deny on mismatched native image/layout or required dependency,
+new source appearing, altered frozen environment, stale source and replay.
+Verify new paths launch no unapproved process and retain existing supported
+CLI authority. Keep current stage and cumulative bounds; exhaustion refuses.
+Verify original Scoop environment and newer Git 17 MiB prepared
+Checkout/Commit, denial/stale cases, exact-head locked CI/governance and
+independent review before activation or merge. Preserve #919 Open and retain
+the separate Push shell residual. This section does not claim production
+compatibility, successful tests, or independent acceptance.
