@@ -288,6 +288,20 @@ jobs:
         timeout-minutes: 6
         run: ./scripts/test_i324_legacy_git_query_matrix.ps1 -UsePinnedMinGit
 
+      # I324 evidence-only release package oracle. Keep it in the existing
+      # Windows workspace workflow rather than adding a one-off workflow.
+      - name: I324 official MinGit writer provenance
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 1017
+        shell: pwsh
+        timeout-minutes: 6
+        run: ./scripts/probe_i324_official_writer_profile.ps1 -Package MinGit
+
+      - name: I324 official PortableGit writer provenance
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 1017
+        shell: pwsh
+        timeout-minutes: 6
+        run: ./scripts/probe_i324_official_writer_profile.ps1 -Package PortableGit
+
       - name: Probe native recovery writable mapping boundary
         shell: pwsh
         run: ./scripts/probe_windows_recovery_mapping.ps1

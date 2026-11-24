@@ -15,3 +15,17 @@ Release-matched upstream implementation: [attr.c](https://github.com/git-for-win
 5. Develop Checkout/Commit first; no whole-issue completion until the six replacements and original Windows acceptance are satisfied.
 
 Review exact candidate/base for binary/launcher/module identity, completeness, frozen environment, exact Read admission, stale/denial behavior, and no hidden child. Request APPROVE or REQUEST CHANGES on this specific proposed basis; an oracle passing is not acceptance. The Accepted ADR-089 remains unchanged. If insufficient, identify the specific missing trust fact and viable alternative. A separately accepted ADR amendment must precede production wiring, and the original Scoop environment 17 MiB Checkout/Commit plus newer Git remain separate acceptance gates. #919 stays Open.
+
+## Hosted native Windows evidence receipt — 2026-11-24
+
+[Run 45298868898](https://github.com/wjhuang88/talos/actions/runs/45298868898) on exact probe head `d3e80ad811909fcbaa85d9c6bc31c69432afda79`: both [MinGit](https://github.com/wjhuang88/talos/actions/runs/45298868898/job/138126061296) and [PortableGit](https://github.com/wjhuang88/talos/actions/runs/45298868898/job/138126061761) completed successfully. The official archives verified their published SHA-256 checksums before extraction. Both contained the same three measured executable image hashes:
+
+| Relative image | SHA-256 (both packages) |
+|---|---|
+| cmd/git.exe | `757d9cf224634cb2a5b8ead077c1b2d572ef4c329908c1554cd80f7e8c4db96e` |
+| mingw64/bin/git.exe | `052e6b3832e83435815c9c2aa59f4f22e4dcaeaad3ae3c961d3b597f4319320d` |
+| usr/bin/sh.exe | `744343e01351ba92e365b7e24eedd4ed18ed3ebe26e68c69d9b5e324fe64a1b5` |
+
+For both launcher and direct native image, in both packages: system config = `etc/gitconfig`, system attributes = `etc/gitattributes`, exec path = `mingw64/libexec/git-core`, empty and missing sources pass without falling through to the alternate root, global order = XDG then HOME, and XDG/HOME attribute fallback passes. Four image/package combinations passed. These are release-package fixture observations, **not proof of an arbitrary installed writer, its launcher/DLL chain or original Scoop environment**. No production authority is inferred from the hashes.
+
+The first run used an additional standalone workflow, which the repository workflow inventory rejects (normal CI #4594). The probe is now integrated into existing Windows workspace CI, scoped to PR #1017; the standalone workflow is removed, not whitelisted. Historical receipt remains valid for its measured original probe script and exact source head; revised CI must validate its own exact head. The unrelated global Issue register missing #1013/#1015 is tracked by their own claim PRs #1014/#1016, not fabricated as owner records in I324.
