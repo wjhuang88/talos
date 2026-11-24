@@ -495,3 +495,7 @@ All four child implementations are merged, ending with Bedrock #1009.
 ## PROVIDER-008-D / I332
 
 Bedrock #985 / I332 Complete / Closed via #1009. Completion Commit: 1745cd3c4d29dd375e680822ffc86f9cc6a3379e. All four #724 protocol families are complete.
+
+## PROVIDER-003-A / I336
+
+Governance #1014 proposes activation of #1013 for the authentication capability ADR and threat model under #132. Ownership takes effect on merge.
