@@ -961,3 +961,6 @@ mod tests {
             .expect("write response");
     }
 }
+
+#[cfg(test)]
+mod offline_search_tests;

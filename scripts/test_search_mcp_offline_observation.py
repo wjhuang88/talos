@@ -1,6 +1,7 @@
 """I337 fixed synthetic loopback fixture checks; no provider traffic."""
 import json
 import unittest
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from search_mcp_offline_observation import CASES, QUERY, STEPS, TOOLS, Reject, decode, observe
@@ -28,6 +29,12 @@ class ObservationTests(unittest.TestCase):
                     self.assertEqual(result["region"], "LOCAL-ONLY")
                     self.assertFalse(result["vendor_observation"])
                     self.assertTrue(result["synthetic_only"])
+                    self.assertRegex(result["talos_commit"], r"^[0-9a-f]{40}$")
+                    observed_at = datetime.fromisoformat(result["observed_at_utc"])
+                    self.assertEqual(observed_at.utcoffset(), timedelta(0))
+                    self.assertEqual(len(result["query_sha256"]), 64)
+                    self.assertEqual(result["query_bytes"], len(QUERY.encode()))
+                    self.assertEqual(result["provider_fixture"], provider)
                     self.assertLessEqual(result["requests"], result["max_requests"])
                     self.assertEqual(result["methods"], list(STEPS[:result["requests"]]))
                     if case in {"schema-drift", "duplicate-tool", "missing-tool", "proxy", "tls", "cancelled", "deadline", "budget"}:
@@ -36,7 +43,17 @@ class ObservationTests(unittest.TestCase):
                         self.assertEqual(result["admissible_count"], 1)
                         self.assertEqual(result["requests"], 4)
                     encoded = json.dumps(result)
-                    for secret in (QUERY, "synthetic secret", "example.com", "example.invalid", "user:secret", "structuredContent"):
+                    for secret in (
+                        QUERY,
+                        "synthetic secret",
+                        "Synthetic title",
+                        "https://example.com/synthetic",
+                        "https://synthetic.invalid/fixture",
+                        "file:///synthetic/not-fetched",
+                        "example.invalid",
+                        "user:secret",
+                        "structuredContent",
+                    ):
                         self.assertNotIn(secret, encoded)
 
     def test_ambient_proxy_does_not_change_loopback(self):
