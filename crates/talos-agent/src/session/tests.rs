@@ -7455,6 +7455,49 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             std::process::id(),
             "must execute in an independent process"
         );
+        // This child runs exactly one test. Install process-wide capture here,
+        // not in the parallel parent, so spawned workers also expose the
+        // existing refusal reasons without logging history or query payloads.
+        struct RestartDiagnostics;
+
+        impl tracing::Subscriber for RestartDiagnostics {
+            fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+                metadata.is_event()
+                    && *metadata.level() == tracing::Level::WARN
+                    && (metadata.target().ends_with("::checkpoint_tools")
+                        || metadata.target().ends_with("::checkpoint_history"))
+            }
+            fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+                tracing::span::Id::from_u64(1)
+            }
+            fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+            fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+            fn enter(&self, _: &tracing::span::Id) {}
+            fn exit(&self, _: &tracing::span::Id) {}
+            fn event(&self, event: &tracing::Event<'_>) {
+                struct Reasons;
+
+                impl tracing::field::Visit for Reasons {
+                    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                        if field.name() == "reason"
+                            && !value.is_empty()
+                            && value.len() <= 80
+                            && value.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+                        {
+                            eprintln!("checkpoint_restart_diagnostic reason={value}");
+                        }
+                    }
+                    fn record_debug(&mut self, _: &tracing::field::Field, _: &dyn std::fmt::Debug) {
+                    }
+                }
+
+                event.record(&mut Reasons);
+            }
+        }
+
+        tracing::subscriber::set_global_default(RestartDiagnostics)
+            .expect("isolated restart diagnostic subscriber");
+        eprintln!("checkpoint_restart_diagnostic_capture_ready");
         recover_in_fresh_process(std::path::Path::new(&root)).await;
         return;
     }
