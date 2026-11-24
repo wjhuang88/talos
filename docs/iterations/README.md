@@ -1,3 +1,7 @@
+## I337 / SEARCH-001-D2-T3 — proposed offline MCP evidence harness
+
+[I337](I337-search-mcp-offline-observation.md) / [Owner](../backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): Active / Claimed PROPOSED via #1016; ineffective until independent review, exact-head governance CI and merge CAS. I336 reserved by #1014; I331 and I335 closed; I334, I318, I277, I249 and I164 retain existing independent dispositions. No vendor traffic or runtime/Auto admission.
+
 ## I335 / SEARCH-001-D3-T5 — proposed real Bing transport / explicit opt-in
 
 [Iteration](I335-search-bing-dual-runtime.md) / [owner](../backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [#1001](https://github.com/wjhuang88/talos/issues/1001): Active / Claimed PROPOSED via #1002, no code before effective merge; I333 fully complete and not replayed, Gate-0/#1000 independent; zero default WWW exposure.
