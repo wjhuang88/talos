@@ -155,3 +155,20 @@ and the five Checkout/Commit replacements. MinGit missing rebound layout and
 Windows known-folder inputs remain unresolved. Do not infer Scoop acceptance
 from PortableGit evidence; Push shell remains separate. No production behavior
 or permission changes in this candidate, no Complete claim, #919 remains open.
+
+
+Follow-up on #1027: initial CI #4629 passed all eight jobs; independent
+inline review identified missing `SizeOfHeaders` validation and the review
+comment identified missing exact descriptor-count boundary coverage. The
+candidate now rejects header overlaps in raw and virtual ranges, invalid
+header sizes, and verifies 256/257 descriptors (ordinary and delay, duplicate
+names included). Eight synthetic tests plus one explicitly ignored Windows
+fixture adapter. The new branch-scoped Windows differential reuses pinned
+archive checksums and extraction only: compile the standalone test harness
+with pinned Rust, compare declared import-name union with MSVC
+[DUMPBIN /IMPORTS](https://learn.microsoft.com/en-us/cpp/build/reference/imports-dumpbin)
+for MinGit native bin and PortableGit bin, rebound image and five previously
+observed package DLLs. No extracted Git execution or repeated config probes.
+New-head CI and re-review pending. This compares static declared names only,
+not the ordinary/delay split independently or transitive/dynamic loader
+resolution; never infer complete pre-spawn attestation from it.
