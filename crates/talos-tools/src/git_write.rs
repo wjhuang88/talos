@@ -44,6 +44,11 @@ mod target_config;
 #[path = "git_write/gix_preflight_candidate_tests.rs"]
 mod gix_preflight_candidate_tests;
 
+// I324 D2: supplied-byte dependency nomination only; not loader attestation.
+#[cfg(test)]
+#[path = "git_write/pe_import_frontier_tests.rs"]
+mod pe_import_frontier_tests;
+
 #[path = "git_write/checkout_state.rs"]
 mod checkout_state;
 
