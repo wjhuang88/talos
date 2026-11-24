@@ -1,6 +1,6 @@
 # Iteration I334: ARCH-035 E3a — CLI Actor And Embedded SDK Host Composition Parity
 
-> Document status: Active / Claimed proposed by atomic governance PR #995 — ineffective until reviewed target-main merge
+> Document status: Active / Review — effective claim #995; bounded E3a implementation evidence #996 and #998 accepted; full E3a conformance remains incomplete
 > Published plan date: 2026-11-20
 > Parent: [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [Issue #897](https://github.com/wjhuang88/talos/issues/897)
 > Objective: verify and minimally converge the actually supported CLI/TUI canonical Session actor path and embedded SDK RuntimeBuilder opt-in local binding on accepted STORE-002 E + ARCH-035 E2 concrete delegates without changing host defaults, startup/recovery, Session/permission authority, SDK source compatibility or storage paths/formats
@@ -20,9 +20,9 @@
 | Governance Claim PR | #995 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I320 E0/E1/ADR-104 #936 accepted; STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; E2 #979 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` with native CI #4412 8/8 and independent API/SDK review; I330 owner-first #987 merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22` with docs CI #4455, independent review and CAS. #995 is governance-only: no E3a code/acceptance. Claim/activation require exact-head docs CI, both validators, independent Host/API/non-overlap review, single-maintainer authorization and merge-time CAS. |
-| Implementation PR | Not started (implementation forbidden before #995 main merge) |
-| Last Updated | 2026-11-20 |
-| Handoff / Release Condition | E3a only effective after reviewed #995 claim+activation merge; E3b, E4, STORE-002 F, ServerHost and #897 closure separately gated |
+| Implementation PR | #996 merged source `51b6e548e26e98444459ce93340149aa7bfc4578`; #998 merged source `ce6c56d2290d11c058ec33b9876d546ac9dce056`; Draft #1010 focused startup reconciliation test candidate pending CI and review, not yet accepted |
+| Last Updated | 2026-11-23 |
+| Handoff / Release Condition | I334 E3a remains Active / Review until default-vs-custom startup, permission/cancellation/receipt/fault parity and independently reviewed exact-head tests are accepted; E3b, E4, STORE-002 F, ServerHost and #897 closure separately gated |
 
 ## Published Baseline
 
@@ -64,12 +64,17 @@
 
 ## Actual Activation And Execution
 
-Finalized governance **proposal on governance PR #995**: the ARCH-035 source owner and I334 together propose E3a `Claimed`/`Active`. Neither is effective before exact-head docs CI, both validators, independent Host/SDK/non-overlap review, single-maintainer CAS and target-main merge. No E3a implementation, API, tests, production Host change or Completion Commit in #995.
+The atomic E3a Claim [#995](https://github.com/wjhuang88/talos/pull/995) **merged** to main as `08f2a41c5f83ad7a87e310370df83d140c39e889` on 2026-11-20, activating the bounded I334 work slice; the original proposed-status wording above is historical, not current activation status.
+
+- [#996](https://github.com/wjhuang88/talos/pull/996): accepted **partial E3a** CLI actor/Todo lazy-registration and SDK public integration fixtures; main source `51b6e548e26e98444459ce93340149aa7bfc4578`. Native CI #4496 had 8/8 applicable jobs successful and independent read-only code review. This preserves production CLI/Session actor constructor, permission and cancellation ownership.
+- [#998](https://github.com/wjhuang88/talos/pull/998): accepted **partial E3a** independent Cargo-root SDK fixture with explicit `local-storage` and one direct Talos dependency, authentic Cargo v4 lock with optional Memory/Evolution/Exploration closure, feature-off `default`/`coding` and opt-in `local-storage` `--locked` coverage, typed invalid-ID/no-create, lazy optional stores and durable TLOG reopen. Main source **`ce6c56d2290d11c058ec33b9876d546ac9dce056`**; exact-head [CI #4561](https://github.com/wjhuang88/talos/actions/runs/45144165793) **8/8 SUCCESS**; [independent code-only APPROVE](https://github.com/wjhuang88/talos/pull/998#issuecomment-7096365502) and [single-maintainer CAS](https://github.com/wjhuang88/talos/pull/998#issuecomment-7097798160). Final source diff comprises only five SDK fixture/validator paths, no production Host/Agent/Session or CI workflow behavior.
+- Current **unaccepted [PR #1010](https://github.com/wjhuang88/talos/pull/1010) candidate**: `crates/talos-session/tests/i334_default_custom_startup.rs` isolates the real `SessionManager::new()` in a child process without mutating the parent test process HOME. It checks repair of stale and unindexed ordinary TLOGs versus a `with_dir()` constructor retaining the stale index. The candidate is **proposed evidence only** pending exact-head tests/CI and independent review; no claim of a production behavior change.
 
 ## Completion Evidence
 
-Not started. The already accepted I330 E2 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` is a **prerequisite**, not this E3a Completion Commit. No E3a implementation or tests claimed.
+**I334 E3a is not Complete.** Accepted #996 and #998 source commits above are partial implementation evidence, not an I334 Completion Commit or owner-first closeout. I330 E2 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` is a prerequisite only. A final E3a Completion Commit may be assigned only from already-existing accepted source after all E3a acceptance tests, review and host boundaries have been verified.
 
 ## Variance And Residuals
 
-E3b Desktop and E4 broad conformance are not activated; #897 remains Open. #670 F and ServerHost remain separately governed.
+- **Remaining E3a acceptance:** default versus custom startup reconciliation under real CLI selection; permission denial and identity fencing, receipt settlement, interrupt/cancellation ordering and bounded fault scenarios. The focused startup candidate addresses one evidence gap only; do not silently promote existing Agent/Session failure history into a waiver.
+- **Separately governed:** E3b Desktop Create/Existing/unbound source migration, E4 broad cross-host equivalence, STORE-002 F/#670 crash/fault provider conformance and ServerHost/#361. Parent [#897](https://github.com/wjhuang88/talos/issues/897) **stays OPEN** after #998; automatic closure caused by the partial fixture PR was corrected via explicit reopen.
