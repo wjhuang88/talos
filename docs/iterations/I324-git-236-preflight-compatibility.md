@@ -117,3 +117,41 @@ object cleanup after initial exit-1 runs; repaired reruns exit 0. Format and 15
 candidate tests pass; original-environment 17 MiB preparation fails on the Git
 environment guard. No runtime implementation, acceptance or completion asserted;
 preserve all review/provenance and original-environment mutation gates.
+
+
+## 2026-11-24 D1 acceptance and D2 dependency-nomination candidate
+
+D1 design constraints accepted by the maintainer on exact
+[#1019](https://github.com/wjhuang88/talos/pull/1019) head
+`6fd83f13ba4ada473ced3d96296880f0259eb6ff` and merged as
+`262b6ca7fa7ec39b27fbee457f74913fbc8e8cc0` after CI #4627 (8/8) and
+independent D1-only approval. See the
+[maintainer authorization](https://github.com/wjhuang88/talos/pull/1019#issuecomment-7131458487)
+and [merge receipt](https://github.com/wjhuang88/talos/issues/919#issuecomment-7131469051).
+The reviewed ADR proposal text remains non-operative for production effects;
+the strict design constraint is accepted, no runtime permission is granted.
+Previous status references above are historical checkpoints.
+
+D2 first bounded code candidate: pure PE32+ AMD64 import and RVA-based delay-import
+name enumeration from caller-supplied bytes, using no dependency/lock changes,
+unsafe, filesystem/ambient environment reads, loader calls or child processes.
+Test-only registration until approved production admission exists. Bound image,
+section, directory, descriptor and name sizes; reject truncated, unmapped,
+overlapping, malformed or unsupported forms. Names are not paths or authority.
+Synthetic fixtures exercise both import kinds, empty lists, malformed ranges,
+unsupported name/delay formats and budget failures.
+[PE format](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format)
+defines the structures; [Windows DLL search order](https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order)
+also includes OS-controlled redirection, API sets, SxS, loaded modules, KnownDLLs
+and search paths. Static declared names do not establish their resolution,
+transitive/forwarded/dynamic load closure, mapped bytes, or race-resistant
+pre-spawn identity. An empty import list is not loader safety. No trusted
+attestor is delivered and no root/profile is activated.
+
+Next gates: independent review of the parser, exact-head CI, actual pinned
+image differential; separately reviewed binding of complete relevant loader
+resolution and exact admitted file/absence witnesses, then source nomination
+and the five Checkout/Commit replacements. MinGit missing rebound layout and
+Windows known-folder inputs remain unresolved. Do not infer Scoop acceptance
+from PortableGit evidence; Push shell remains separate. No production behavior
+or permission changes in this candidate, no Complete claim, #919 remains open.
