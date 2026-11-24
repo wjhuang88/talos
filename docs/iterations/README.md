@@ -499,3 +499,7 @@ Bedrock #985 / I332 Complete / Closed via #1009. Completion Commit: 1745cd3c4d29
 ## PROVIDER-003-A / I336
 
 Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
+
+## PROVIDER-003-B / I338
+
+[I338](I338-provider003b-shared-credential-lifecycle.md) / [Owner](../backlog/active/PROVIDER-003-B-shared-credential-lifecycle.md) / [#1024](https://github.com/wjhuang88/talos/issues/1024): Active / Claimed proposed via #1025, ineffective until independent review, exact-head governance CI/validators and merge CAS. Shared lease lifecycle only; A closed, C–G separate. No implementation started.
