@@ -1,6 +1,7 @@
 //! I324 D2 candidate: enumerate declared PE32+ DLL names from supplied bytes.
 //! This is not a Windows loader, a dependency closure, or an attestation.
-//! No filesystem, environment, process, unsafe code or authority is used.
+//! The parser uses no filesystem, environment, process, unsafe code or authority.
+//! The ignored package-fixture adapter reads only its explicit test input.
 
 use std::collections::BTreeSet;
 
@@ -428,5 +429,32 @@ fn pe_import_frontier_fixture_from_file() {
     }
     for name in imports.delayed {
         println!("I324_PE_DECLARED kind=delayed name={name}");
+    }
+}
+
+// The only I/O in this module is an explicitly invoked fixture adapter.
+// The package oracle supplies an exact path after archive hash validation.
+// Ordinary workspace tests do not execute this test.
+#[test]
+#[ignore = "requires a checksum-verified disposable PE fixture"]
+fn pe_import_frontier_observe_pinned_fixture() {
+    use std::io::Read;
+
+    let path = std::env::var_os("TALOS_I324_PE_FIXTURE").expect("explicit fixture path");
+    let file = std::fs::File::open(path).expect("fixture open");
+    let mut bytes = Vec::new();
+    file.take(MAX_IMAGE as u64 + 1)
+        .read_to_end(&mut bytes)
+        .expect("bounded fixture read");
+    let imports = declared_imports(&bytes).expect("pinned PE declared imports");
+    assert!(
+        !imports.ordinary.is_empty(),
+        "expected ordinary fixture imports"
+    );
+    for name in imports.ordinary {
+        println!("I324_PE_IMPORT kind=ordinary dll={name}");
+    }
+    for name in imports.delayed {
+        println!("I324_PE_IMPORT kind=delay dll={name}");
     }
 }
