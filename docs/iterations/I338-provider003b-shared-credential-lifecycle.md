@@ -55,7 +55,7 @@ Board also records independent Review/Active tasks (e.g. DEPENDENCY-003-A, clipb
 ## Planned Validation
 
 - Prior to activation: model described in B owner ran 16/16 named assertions; previous exploratory mislabeled count retained there. No Rust/runtime proof. Candidate numeric boundaries subject to main-session and independent review; both governance scripts and exact-head scoped CI including Issue reconciliation required.
-- After effective merge: deterministic fake-source/counted single-flight, barrier cancellation and stale publish tests, injected clocks/capacity/CAS, synthetic static config/host matrix and canary redaction; cargo check --workspace --locked; cargo clippy --workspace --locked -- -D warnings; cargo test --workspace --locked; applicable native Linux/macOS/Windows CI and protected-scope/API review. No live vendor data. Preserve skips and failures.
+- After effective merge: deterministic fake-source/counted single-flight, barrier cancellation and stale publish tests, offline explicit-source conflict rejection (redacted error, zero acquisition/store/helper calls and outbound requests; omitted-auth precedence positive controls), cancellation-delayed fake with actual running/peak counters proving <=16 across repeated detach/reacquire, permit recovery only after confirmed exit, injected clocks/capacity/CAS, synthetic static config/host matrix and canary redaction; cargo check --workspace --locked; cargo clippy --workspace --locked -- -D warnings; cargo test --workspace --locked; applicable native Linux/macOS/Windows CI and protected-scope/API review. No live vendor data. Preserve skips and failures.
 - Documentation: B owner, C handoff, user-facing README / config reference and SDK contract as applicable; parent/Board/index/Issue owner-first sync. No new configuration in governance-only PR.
 - Risks and rollback: cross-profile leakage, cancellation races, time skew, secret retention and static drift; private resolver and controlled sources, no migration of vendor implementations until independently claimed, preserve static behavior and fail closed.
 
@@ -66,6 +66,8 @@ Board also records independent Review/Active tasks (e.g. DEPENDENCY-003-A, clipb
 | 2026-11-24 | Proposed atomic claim + activation | #1025, source #1024; both become effective ONLY after target-main merge. No implementation started. |
 | 2026-11-24 | Read-only evidence | Base source and 16/16 arithmetic/CAS model; local clone blocked by DNS, exact-head CI and both validators not yet verified. |
 | 2026-11-24 | Authorization | Independent review required. #1021 single-maintainer exception only #1020. Main session must resolve blocking review, confirm numeric/model gates, check exact head, governance validators, remote reconciliation and repeat CAS; no merge by executing session. |
+
+| 2026-11-24 | Independent review revision | Review of 0339189f requested explicit-source admission and actual producer lifetime bounds; B owner and planned validation revised only. CI4620 passed on reviewed historical head; new exact-head CI and re-review required. |
 
 ## Verification Evidence / Residuals
 
