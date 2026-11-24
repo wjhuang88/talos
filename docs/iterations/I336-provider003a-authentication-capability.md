@@ -1,13 +1,13 @@
 # Iteration I336: Authentication capability architecture
 
-> Document status: Active (effective on #1014 merge)
+> Document status: Complete / Closed
 > Baseline: 494a009b701b47597a7f3580ddc354f03f7be47b
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Define acquisition, refresh, final-request signing and replay contracts in an ADR and threat model. |
@@ -16,8 +16,8 @@
 | Governance Claim PR | #1014 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #1014 used independent review. For the ADR only, the sole maintainer authorized the PR #1020 exception in AGENT-COLLABORATION §3. Independent Agent security re-review passed on d50941297d1cf7491a813c7f1cb9cd744929d4dd (PR comment 7122440728). |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-23 |
+| Implementation PR | #1020 |
+| Last Updated | 2026-11-24 |
 | Handoff / Release Condition | Merge the reviewed architecture deliverable and record its commit before closing #1013. |
 
 ## Acceptance
@@ -30,3 +30,9 @@
 This slice delivers architecture only. Each later implementation requires its own claim. Parent #132 stays open.
 
 The active I334 host composition and I324 Git compatibility work retain their own owners. The first deliverable is a source-backed capability matrix and proposed ADR. The claim PR does not accept an authentication design.
+
+## Completion
+
+Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
+
+Completion Commit: 2dcbfb6090aaae3f2f94e5930d28bb56698eea3d

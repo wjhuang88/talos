@@ -14,6 +14,8 @@ Each ADR file is authoritative for its own status and decision. The complete pre
 preserved unchanged at
 [`DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md`](DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 
+[ADR-108](108-provider-authentication-capabilities.md) records the accepted provider authentication capability and threat model for #132.
+
 ## Status Model
 
 - **Proposed** — decision is defined but not yet accepted by current implementation/review evidence.

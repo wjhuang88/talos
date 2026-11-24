@@ -489,4 +489,4 @@ Bedrock #985 / I332 Complete / Closed via #1009. Completion Commit: 1745cd3c4d29
 
 ## PROVIDER-003-A / I336
 
-Governance #1014 proposes activation of #1013 for the authentication capability ADR and threat model under #132. Ownership takes effect on merge.
+Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
