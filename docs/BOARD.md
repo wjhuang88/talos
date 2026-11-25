@@ -2,6 +2,10 @@
 
 [Owner](tasks/background-job-default-continuation.md). Complete upon merge of #1030. Installed Linux CLI passed success, failure, timeout and overlapping user input with separate tool approval. Completion Commit: a37f9f36.
 
+## Desktop relative workspace approval (2026-11-21)
+
+Complete / Closed. Desktop shell approval and execution resolve the same workspace. Implementation commit `4462a35b` merged in #990. [Task and acceptance](tasks/desktop-relative-workspace-approval.md)
+
 ## SEARCH-001-D2-T3 / I337 — proposed offline MCP evidence harness
 
 [Owner](backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](iterations/I337-search-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): In Progress / Claimed PROPOSED via [#1016](https://github.com/wjhuang88/talos/pull/1016), ineffective until merge. Offline-only synthetic search protocol/replay, no external vendor calls, default routing or new provider. I331 documentary slice remains closed; #848/#624 stay open for admission and real-region evidence.
