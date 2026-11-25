@@ -342,3 +342,94 @@ fn handle_structured_legacy_projection(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_core::session::TurnCompletionStatus;
+
+    #[test]
+    fn progress_error_keeps_processing_and_queue_until_authoritative_failure() {
+        for cancelling in [false, true] {
+            let mut engine = ConversationEngine::new("model".into(), "provider".into());
+            engine.handle_turn_started();
+            engine.enqueue_steering("queued original text 中文".into());
+            let mut state = if cancelling {
+                BridgeTurnState::LegacyCancelling {
+                    session_id: "session".into(),
+                    turn_id: "turn".into(),
+                    next_sequence: 1,
+                    sender_generation: 7,
+                }
+            } else {
+                BridgeTurnState::LegacyRunning {
+                    session_id: "session".into(),
+                    turn_id: "turn".into(),
+                    next_sequence: 1,
+                    sender_generation: 7,
+                }
+            };
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            let dispatch = handle_legacy_turn_event(
+                &mut engine,
+                &mut state,
+                &tx,
+                "session".into(),
+                "turn".into(),
+                1,
+                TurnEventPayload::Progress {
+                    event: AgentEvent::Error {
+                        message: "provider failed".into(),
+                    },
+                },
+                7,
+            );
+            assert!(matches!(dispatch, QueuedDispatch::None));
+            assert!(engine.status_snapshot().is_processing);
+            assert!(
+                rx.try_recv().is_err(),
+                "no premature terminal/error projection"
+            );
+            assert_eq!(
+                engine.steering_queue_snapshot().entries[0].text,
+                "queued original text 中文"
+            );
+
+            let dispatch = handle_legacy_turn_event(
+                &mut engine,
+                &mut state,
+                &tx,
+                "session".into(),
+                "turn".into(),
+                2,
+                TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Error {
+                        message: "provider failed".into(),
+                    },
+                },
+                7,
+            );
+            assert!(matches!(dispatch, QueuedDispatch::None));
+            assert!(matches!(state, BridgeTurnState::PausedAfterFailure));
+            assert!(!engine.status_snapshot().is_processing);
+            assert_eq!(
+                engine.steering_queue_snapshot().entries[0].text,
+                "queued original text 中文"
+            );
+            let mut terminal_statuses = 0;
+            let mut error_blocks = 0;
+            while let Ok(output) = rx.try_recv() {
+                match output {
+                    UiOutput::Status(status) if !status.is_processing => terminal_statuses += 1,
+                    UiOutput::Content(talos_conversation::ContentOutput::Block {
+                        source: talos_conversation::MessageSource::Error,
+                        ..
+                    }) => error_blocks += 1,
+                    _ => {}
+                }
+            }
+            assert_eq!(terminal_statuses, 1);
+            assert_eq!(error_blocks, 1);
+        }
+    }
+}

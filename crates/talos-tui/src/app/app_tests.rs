@@ -65,6 +65,125 @@ fn queued_body_remains_visible_beside_pending_tool_animation() {
 }
 
 #[test]
+fn user_history_spacing_survives_live_preview_frame_allocation() {
+    use talos_conversation::{ConversationEngine, UiOutput};
+    for height in [12, 24] {
+        let mut engine = ConversationEngine::new("model".into(), "provider".into());
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.first_message_dispatched = true;
+        tui.state.status.is_processing = true;
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(80, height));
+        for output in engine.handle_turn_started() {
+            tui.handle_ui_output(output);
+        }
+        for output in engine.enqueue_steering("user-tail-visible".into()) {
+            tui.handle_ui_output(output);
+        }
+        tui.draw_frame().expect("queued frame");
+        assert!(
+            tui.terminal
+                .test_rendered_text()
+                .contains("user-tail-visible")
+        );
+        let submission = engine.prepare_steering_submission().expect("reservation");
+        assert!(engine.commit_prepared_steering(&submission.id));
+        tui.handle_ui_output(UiOutput::SteeringQueueSnapshot(
+            engine.steering_queue_snapshot(),
+        ));
+        // Match the bridge's start projection after the Actor takes custody.
+        for item in submission.items {
+            for output in engine.start_user_message(&item.text) {
+                tui.handle_ui_output(output);
+            }
+        }
+        tui.commit_pending_transcript().expect("commit");
+        tui.state.thinking_preview = Some("next-live-content".into());
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(80, height));
+        tui.draw_frame().expect("frame");
+        let frame = tui.terminal.test_rendered_text();
+        let rows: Vec<_> = frame.lines().collect();
+        let user = rows
+            .iter()
+            .position(|row| row.contains("user-tail-visible"))
+            .unwrap_or_else(|| panic!("user visible at height {height}: {frame}"));
+        let next = rows
+            .iter()
+            .position(|row| row.contains("next-live-content"))
+            .unwrap_or_else(|| panic!("preview visible at height {height}: {frame}"));
+        assert!(
+            next > user + 1 && rows[user + 1].trim().is_empty(),
+            "height {height}: {frame}"
+        );
+    }
+}
+
+#[test]
+fn engine_turn_boundaries_keep_frame_animated_until_authoritative_completion() {
+    use talos_core::message::{AgentEvent, StopReason};
+    use talos_core::session::TurnCompletionStatus;
+
+    for completion in [
+        TurnCompletionStatus::Success {
+            final_text: "answer".into(),
+            new_messages: vec![],
+        },
+        TurnCompletionStatus::Cancelled,
+        TurnCompletionStatus::Error {
+            message: "finalization failed".into(),
+        },
+    ] {
+        let mut engine =
+            talos_conversation::ConversationEngine::new("model".into(), "provider".into());
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.first_message_dispatched = true;
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(80, 24));
+        for output in engine.handle_turn_started() {
+            tui.handle_ui_output(output);
+        }
+        for event in [
+            AgentEvent::TurnStart,
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "answer".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Default::default(),
+            },
+        ] {
+            for output in engine.handle_agent_event(&event) {
+                tui.handle_ui_output(output);
+            }
+            tui.draw_frame().expect("active frame");
+            let before = tui.terminal.test_rendered_text();
+            let frame = tui.processing_frame;
+            tui.advance_processing_frame();
+            tui.draw_frame().expect("next active frame");
+            assert!(tui.state.status.is_processing, "{event:?}");
+            assert_ne!(frame, tui.processing_frame, "{event:?}");
+            assert_ne!(before, tui.terminal.test_rendered_text(), "{event:?}");
+        }
+        for output in engine.handle_turn_completed(&completion) {
+            tui.handle_ui_output(output);
+        }
+        tui.draw_frame().expect("completed frame");
+        assert!(!tui.state.status.is_processing);
+        let completed = tui.terminal.test_rendered_text();
+        tui.advance_processing_frame();
+        tui.draw_frame().expect("stable completed frame");
+        assert_eq!(tui.processing_frame, 0);
+        assert_eq!(completed, tui.terminal.test_rendered_text());
+    }
+}
+
+#[test]
 fn history_return_shortcut_restores_tail_without_cancelling_or_editing() {
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
@@ -460,6 +579,51 @@ fn stream_render_state_wraps_user_blocks_with_background_rows() {
     state.reset();
     assert!(state.source().is_none());
     assert_eq!(state.preview(), "");
+}
+
+#[test]
+fn projected_user_history_keeps_blank_row_before_following_content() {
+    use talos_conversation::{ContentOutput, UiOutput};
+    for following in [
+        UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::Assistant,
+            text: "next assistant".into(),
+        }),
+        UiOutput::Reasoning("next reasoning".into()),
+        UiOutput::ToolResult(ToolResultDisplay {
+            tool_name: Some("fixture".into()),
+            content: "next result".into(),
+            is_error: false,
+            todo_presentation: None,
+        }),
+    ] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::User,
+            text: "user 中文 tail".into(),
+        }));
+        tui.handle_ui_output(following);
+        tui.commit_pending_transcript().expect("commit transcript");
+        for width in [12, 80, 12] {
+            let projected = project_history(
+                &tui.transcript,
+                width,
+                100,
+                &HistoryScrollState::follow_tail(),
+            );
+            let user_end = projected
+                .rows
+                .iter()
+                .position(|row| row.line.text.contains("tail"))
+                .expect("user tail");
+            assert!(projected.rows[user_end + 1].line.text.trim().is_empty());
+            assert!(
+                projected.rows[user_end + 2..]
+                    .iter()
+                    .any(|row| !row.line.text.trim().is_empty())
+            );
+        }
+    }
 }
 
 #[test]
