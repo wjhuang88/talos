@@ -17,7 +17,7 @@
 | Governance Claim PR | #893 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Exact-head activation/ADR-101 review: https://github.com/wjhuang88/talos/pull/893#issuecomment-6757010739; merged as bad94be8151253b7cc4806c3b4e9a449aa74eb69 |
-| Implementation PR | #953 (default-off foundation; depends on #917) |
+| Implementation PR | #1030 (default activation); #953 (foundation) |
 | Last Updated | 2026-11-25 |
 | Handoff / Release Condition | Accepted successor decision, effective target claim, tested implementation and exact-head review/CI |
 
