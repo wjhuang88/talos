@@ -1,6 +1,7 @@
 # BG-CONTINUE-001: Default Background Completion Continuation
 
-> Document status: Review / Claimed (default continuation implemented and installed CLI acceptance passed)
+> Document status: Complete / Closed upon merge of #1030
+> Completion Commit: a37f9f3623e1b17d4af4f5010a56fa5a5fd0de48, 8a5a569f
 > Historical checkpoints below describe their original revisions, not the current proposed disposition.
 > Deliverable: background success, failure and timeout resume the originating live Session without another user message or opt-in flag.
 
@@ -8,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Talos |
 | Work Slice | Actor-owned terminal admission and default continuation, cancellation/consumption deduplication, bounded context, tests and docs |
@@ -34,6 +35,16 @@ submission and one explicit shell approval. A successful process, exit 7 and a
 two-second timeout each produced a third model request carrying the matching job
 ID and terminal state. Each continuation response appeared in the terminal.
 Evidence: target/bg-install-uat-03/result.json and the three PTY transcripts.
+
+The reviewed implementation a37f9f36 also routes user input during continuation
+to the Actor queue and matches terminal events to the active turn ID. Its installed
+Linux release binary talos-bg-live-a37f9f36 (SHA256
+83f650d21b72d4b3e91a5f457e82889a8c057ee66a813f0a5e583f18d9d424b2)
+passed all three terminal states and a fourth interactive overlap case. The user
+submitted a second request while the continuation provider response was pending.
+The REPL displayed both responses and requested a separate approval for the second
+shell invocation. Local evidence: target/bg-install-uat-a37f9f36/result.json and
+overlap.pty.log. The independent code reviewer approved a37f9f36.
 
 ## Proposed atomic activation packet (historical; merged in #893)
 
