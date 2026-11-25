@@ -188,6 +188,8 @@ impl BackgroundJobSupervisor {
         session_id: String,
         generation: u64,
     ) -> Self {
+        let mut completions = crate::background_completion::CompletionSlots::default();
+        completions.set_generation(generation);
         Self {
             inner: Arc::new(SupervisorInner {
                 state: Mutex::new(SupervisorState {
@@ -198,7 +200,7 @@ impl BackgroundJobSupervisor {
                     launching: 0,
                     jobs: HashMap::new(),
                     terminal_order: VecDeque::new(),
-                    completions: None,
+                    completions: Some(completions),
                 }),
                 identity: RwLock::new(SessionIdentity {
                     id: session_id,

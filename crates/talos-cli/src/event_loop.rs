@@ -31,6 +31,7 @@ pub(crate) enum AppEvent {
     UserInput(String),
     UserInterrupt,
     ApprovalRequested(Box<TerminalApprovalRequest>),
+    BackgroundTurnStarted,
     AgentTextDelta(String),
     AgentToolCall {
         id: String,
@@ -56,7 +57,7 @@ pub(crate) enum AppState {
     WaitingForInput,
     AgentRunning {
         cancel_token: CancellationToken,
-        task_handle: JoinHandle<()>,
+        task_handle: Option<JoinHandle<()>>,
     },
     ForkPending {
         operation_id: uuid::Uuid,
@@ -167,6 +168,13 @@ impl EventLoop {
         tokio::spawn(async move {
             while let Some(session_event) = eq_rx.recv().await {
                 match session_event {
+                    SessionEvent::TurnEvent {
+                        turn_id,
+                        payload: TurnEventPayload::Started,
+                        ..
+                    } if turn_id.starts_with("background-") => {
+                        let _ = event_tx_forward.send(AppEvent::BackgroundTurnStarted);
+                    }
                     SessionEvent::TurnEvent {
                         payload:
                             TurnEventPayload::Progress {
@@ -438,12 +446,22 @@ impl EventLoop {
                     let _ = sq_tx.send(SessionOp::Interrupt).await;
                 });
                 // Abort the dummy task handle (no-op, but keeps the enum contract).
-                task_handle.abort();
+                if let Some(task) = task_handle {
+                    task.abort();
+                }
                 self.deny_pending_approvals(true);
                 self.background_tools.clear();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
                 self.first_ctrl_c_time = None;
+            }
+
+            (AppState::WaitingForInput, AppEvent::BackgroundTurnStarted) => {
+                println!();
+                self.state = AppState::AgentRunning {
+                    cancel_token: CancellationToken::new(),
+                    task_handle: None,
+                };
             }
 
             (AppState::AgentRunning { .. }, AgentTextDelta(delta)) => {
@@ -589,7 +607,7 @@ impl EventLoop {
 
         self.state = AppState::AgentRunning {
             cancel_token,
-            task_handle,
+            task_handle: Some(task_handle),
         };
     }
 
@@ -707,8 +725,10 @@ impl EventLoop {
         } = std::mem::replace(&mut self.state, AppState::ShuttingDown)
         {
             cancel_token.cancel();
-            task_handle.abort();
-            let _ = task_handle.await;
+            if let Some(task) = task_handle {
+                task.abort();
+                let _ = task.await;
+            }
         }
     }
 }
@@ -1109,7 +1129,7 @@ mod approval_queue_tests {
                 event_rx,
                 state: AppState::AgentRunning {
                     cancel_token: cancel.clone(),
-                    task_handle: tokio::spawn(async {}),
+                    task_handle: Some(tokio::spawn(async {})),
                 },
                 first_ctrl_c_time: None,
                 session,

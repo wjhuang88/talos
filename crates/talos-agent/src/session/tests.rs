@@ -755,10 +755,6 @@ async fn real_background_process_terminal_resumes_actor_without_second_submissio
                 model_context_limit: 128_000,
             },
         );
-        actor
-            .background_jobs
-            .enable_completions(0)
-            .expect("test-only activation");
         let supervisor = actor.background_jobs.clone();
         handle
             .sq_tx
