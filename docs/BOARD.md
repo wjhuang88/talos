@@ -1,3 +1,7 @@
+## 会话恢复归并与剩余验收
+
+后台续跑已合入 #1030。SESSION-UI-001 补充回归进入复审；#923 等待原生 Windows 验收。权限分类待认领，审批、恢复诊断和编辑预览按原 owner 复核。[任务与验收](tasks/2026-11-11-session-recovery-handoff.md)
+
 ## BG-CONTINUE-001 — default background continuation
 
 [Owner](tasks/background-job-default-continuation.md). Complete upon merge of #1030. Installed Linux CLI passed success, failure, timeout and overlapping user input with separate tool approval. Completion Commit: a37f9f36.
