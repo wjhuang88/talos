@@ -1,5 +1,5 @@
 # I324 test-only official Git package oracle; never point at an installed Git.
-param([ValidateSet('MinGit','PortableGit')][string]$Package = 'MinGit', [switch]$SelectedWriterOnly)
+param([ValidateSet('MinGit','PortableGit')][string]$Package = 'MinGit', [switch]$SelectedWriterOnly, [switch]$PeImportsOnly)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Native Windows PowerShell 7 required.' }
@@ -26,6 +26,65 @@ try {
         if (-not [IO.File]::Exists($extractor)) { throw 'Runner 7-Zip unavailable.' }
         & $extractor x -y "-o$install" $archive | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'PortableGit extraction failed.' }
+    }
+    if ($PeImportsOnly) {
+        if ($SelectedWriterOnly) { throw 'Choose one oracle mode.' }
+        # Static comparison only, using the hash-verified extracted archive.
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+        if (-not [IO.File]::Exists($vswhere)) { throw 'Runner vswhere unavailable.' }
+        $vs = @(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
+        if ($LASTEXITCODE -ne 0 -or $vs.Count -ne 1) { throw 'Runner MSVC tools unavailable.' }
+        $toolVersion = (Get-Content -LiteralPath (Join-Path $vs[0] 'VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt') -Raw).Trim()
+        if ($toolVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Unexpected MSVC tool version.' }
+        $dumpbin = Join-Path $vs[0] "VC/Tools/MSVC/$toolVersion/bin/Hostx64/x64/dumpbin.exe"
+        if (-not [IO.File]::Exists($dumpbin)) { throw 'Runner dumpbin unavailable.' }
+        $source = Join-Path $PSScriptRoot '../crates/talos-tools/src/git_write/pe_import_frontier_tests.rs'
+        $harness = Join-Path $root 'pe-import-tests.exe'
+        & rustc +1.99.0 --edition=2024 --test $source -o $harness
+        if ($LASTEXITCODE -ne 0) { throw 'PE fixture harness build failed.' }
+        & $harness
+        if ($LASTEXITCODE -ne 0) { throw 'PE synthetic fixture tests failed.' }
+        $images = @('mingw64/bin/git.exe')
+        if ($Package -eq 'PortableGit') {
+            $images += @(
+                'mingw64/libexec/git-core/git.exe',
+                'mingw64/libexec/git-core/libpcre2-8-0.dll',
+                'mingw64/libexec/git-core/libintl-8.dll',
+                'mingw64/libexec/git-core/libiconv-2.dll',
+                'mingw64/libexec/git-core/libssp-0.dll',
+                'mingw64/libexec/git-core/zlib1.dll'
+            )
+        }
+        $previous = [Environment]::GetEnvironmentVariable('TALOS_I324_PE_FIXTURE','Process')
+        try {
+            foreach ($relative in $images) {
+                $image = Join-Path $install $relative
+                if (-not [IO.File]::Exists($image)) { throw "Missing pinned fixture: $relative" }
+                $hash = (Get-FileHash -LiteralPath $image -Algorithm SHA256).Hash.ToLowerInvariant()
+                [Environment]::SetEnvironmentVariable('TALOS_I324_PE_FIXTURE',$image,'Process')
+                $candidate = @(& $harness --exact pe_import_frontier_fixture_from_file --ignored --nocapture)
+                if ($LASTEXITCODE -ne 0) { throw "PE parser fixture failed: $relative" }
+                $oracle = @(& $dumpbin /NOLOGO /IMPORTS $image)
+                if ($LASTEXITCODE -ne 0) { throw "Dumpbin fixture failed: $relative" }
+                # Compare the union of declared ordinary and delay imports,
+                # not resolved paths, dynamic loading, or mapped identity.
+                $actual = @($candidate | ForEach-Object {
+                    if ($_ -cmatch '^I324_PE_DECLARED kind=(ordinary|delayed) name=([a-z0-9_.-]+\.dll)$') {
+                        $Matches[2]
+                    }
+                } | Sort-Object -Unique)
+                $expected = @($oracle | ForEach-Object {
+                    if ($_ -match '^\s+([a-z0-9_.-]+\.dll)\s*$') { $Matches[1].ToLowerInvariant() }
+                } | Sort-Object -Unique)
+                if ($expected.Count -eq 0 -or ($actual -join ',') -cne ($expected -join ',')) {
+                    throw "PE import-name differential failed: $relative expected=$($expected -join ',') actual=$($actual -join ',')"
+                }
+                Write-Output "I324_PE_IMPORT_DIFFERENTIAL package=$Package image=$relative sha256=$hash count=$($actual.Count) names=$($actual -join ',') result=pass static_only=true"
+            }
+        } finally {
+            [Environment]::SetEnvironmentVariable('TALOS_I324_PE_FIXTURE',$previous,'Process')
+        }
+        return
     }
     $fixture = Join-Path $root 'fixture'
     $isolatedHome = Join-Path $root 'home'

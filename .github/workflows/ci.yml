@@ -302,6 +302,16 @@ jobs:
         timeout-minutes: 6
         run: ./scripts/probe_i324_official_writer_profile.ps1 -Package PortableGit -SelectedWriterOnly
 
+      # I324 D2: compare supplied-byte parser against MSVC's static oracle.
+      # Do not execute extracted Git images; no production loader claim.
+      - name: I324 pinned PE import differential
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/i324-d2-pe-import-frontier'
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          ./scripts/probe_i324_official_writer_profile.ps1 -Package MinGit -PeImportsOnly
+          ./scripts/probe_i324_official_writer_profile.ps1 -Package PortableGit -PeImportsOnly
+
       - name: Probe native recovery writable mapping boundary
         shell: pwsh
         run: ./scripts/probe_windows_recovery_mapping.ps1
