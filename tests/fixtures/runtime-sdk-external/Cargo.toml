@@ -11,6 +11,8 @@ publish = false
 [features]
 default = []
 coding = ["talos-runtime/shared-composition"]
+# Explicit SDK consumer opt-in; default/coding must not transitively enable it.
+local-storage = ["talos-runtime/local-storage"]
 
 [dependencies]
 anyhow = "1"

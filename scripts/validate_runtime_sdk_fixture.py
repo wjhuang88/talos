@@ -29,6 +29,8 @@ def main():
     talos = [d for d in package["dependencies"] if d["name"].startswith("talos-")]
     if len(talos) != 1 or talos[0]["name"] != "talos-runtime" or talos[0]["kind"] is not None:
         raise ValueError("exactly one normal direct Talos dependency is required: talos-runtime")
+    if data.get("features", {}).get("local-storage") != ["talos-runtime/local-storage"]:
+        raise ValueError("SDK fixture local-storage must remain explicit talos-runtime feature opt-in")
     for source in (fixture / "src").rglob("*.rs"):
         imports = set(re.findall(r"\btalos_\w+\s*::", source.read_text()))
         if imports - {"talos_runtime::"}:
@@ -39,7 +41,7 @@ def main():
         target_dir = Path(os.environ.get("CARGO_TARGET_DIR", root / "target"))
         if not target_dir.is_absolute():
             target_dir = Path.cwd() / target_dir
-        for features in ([], ["--features", "coding"]):
+        for features in ([], ["--features", "coding"], ["--features", "local-storage"]):
             subprocess.run([
                 "cargo", "run", "--locked", "--manifest-path", str(manifest),
                 "--target-dir", str(target_dir), *features,

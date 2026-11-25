@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Active / Claimed — proposed I334 E3a CLI actor and embedded SDK host-composition parity under #995, ineffective until reviewed merge; E3b/E4 unclaimed, #897 Open |
+| Status | Active / Claimed — I334 E3a delivery in Review; #995 effective, #996/#998 partial source merged; E3b/E4 unclaimed, #897 Open |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | [I334](../../iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) — E3a proposed atomic claim+activation #995, ineffective before merge; I330 E2 and I320 E0/E1 Complete / Closed |
+| Selected Iteration | [I334](../../iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) — E3a effective claim #995, partial implementation #996/#998 accepted, additional startup acceptance in Draft #1010; I330 E2 and I320 E0/E1 Complete / Closed |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
@@ -28,9 +28,9 @@
 | Governance Claim PR | #995 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I320 E0/E1/ADR-104 #936 accepted; STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; E2 #979 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` with native CI #4412 8/8 and independent API/SDK review; I330 owner-first #987 merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22` with docs CI #4455, independent review and CAS. #995 is governance-only: no E3a code/acceptance. Claim/activation require exact-head docs CI, both validators, independent Host/API/non-overlap review, single-maintainer authorization and merge-time CAS. |
-| Implementation PR | Not started (E3a; #979 is completed E2 code, not E3a) |
-| Last Updated | 2026-11-20 |
-| Handoff / Release Condition | Claim/Active E3a effective only after reviewed #995 merge. Implementation then separately staged; E3b Desktop, E4 full parity, STORE-002 F, ServerHost and #897 closure separately gated. Until merge target main remains Released from E2. |
+| Implementation PR | E3a partial #996 (merged `51b6e54`) and #998 (merged `ce6c56d`); Draft #1010 startup reconciliation fixture (not yet accepted) |
+| Last Updated | 2026-11-23 |
+| Handoff / Release Condition | I334 E3a remains Active / Review until default startup and permission/fault/cancel/receipt parity are validated with exact-head CI and independent review; E3b Desktop, E4, STORE-002 F, ServerHost and #897 closure separately gated. |
 
 ## Requirement and value
 
@@ -160,6 +160,13 @@ ADR-104's **host/domain ownership and composition-layer placement only** may be 
 - **Independent/authorization:** read-only [Copilot APPROVE on the final exact head](https://github.com/wjhuang88/talos/pull/979#issuecomment-6999596024) confirmed source-compatible opt-in API, with_dir vs new() startup distinction, typed invalid-ID/no-create and unchanged Session TLOG path, optional-store laziness and current SDK behavior. [Final single-maintainer authorization + CAS](https://github.com/wjhuang88/talos/pull/979#issuecomment-7002828221) recorded no overlapping E2 owner, mergeable branch, full validation, and unrelated Provider/Azure main movement per ADR-071. No separate human approval is claimed.
 - **Accepted E2 only:** feature-gated `RuntimeBuilder::durable_session_from_custom_local_profile` delegates to accepted STORE-002 E `LocalStorageProfile::custom_session_manager().create_or_open_session` and unchanged `durable_session`. Tests compare Session ID/path with the direct constructor, validate the `sessions/durable/` transcript and `durable-bindings.sqlite` index, absence of eager Memory/Exploration/Todo DBs, typed invalid identity without creating root directories, and legacy unbound/bound API. Existing CLI/TUI/Desktop/SDK production callers, Session reconciliation, permissions, cancellation, SQL/schema, format and defaults remain unchanged; there is no SQLite-free binary or completed global Host equivalence claim.
 - **Residual and release:** bounded I330 E2 is **Complete / Closed** and this parent's former E2 claim is **Released**. The parent ARCH-035 / #897 remains **Open / Blocked / Released** until separately authorized E3 product-host composition and E4 equivalence evidence and acceptance. STORE-002 F remains independently unclaimed under #670; ServerHost #361 cannot treat E2 as full architecture acceptance.
+
+## I334 E3a effective claim and accepted partial source — 2026-11-23
+
+- **Effective on main:** atomic E3a claim [#995](https://github.com/wjhuang88/talos/pull/995) merged `08f2a41c5f83ad7a87e310370df83d140c39e889`; historical proposal below is superseded for effective status.
+- **Accepted bounded source:** [#996](https://github.com/wjhuang88/talos/pull/996) `51b6e548e26e98444459ce93340149aa7bfc4578` covers CLI/SDK positive conformance, and [#998](https://github.com/wjhuang88/talos/pull/998) `ce6c56d2290d11c058ec33b9876d546ac9dce056` covers independently locked SDK default/coding/local-storage external fixture. #998 [CI #4561](https://github.com/wjhuang88/talos/actions/runs/45144165793) 8/8 and independent review APPROVE; only partial E3a evidence, not completion.
+- **Current work:** [Draft #1010](https://github.com/wjhuang88/talos/pull/1010) proposes a child-process `SessionManager::new()` vs `with_dir()` startup index parity test; unaccepted until exact-head native CI and code review. Broader permission/receipt/cancel/fault behavior remains gated. No production CLI/SDK/Session default migration or E3a Completion Commit.
+- **Parent scope:** ARCH-035 [#897](https://github.com/wjhuang88/talos/issues/897) is **OPEN** (premature automatic closure from #998 corrected). STORE-002 [#670](https://github.com/wjhuang88/talos/issues/670) is OPEN for F. E3b, E4 and ServerHost remain separately governed.
 
 ## I334 E3a atomic claim and activation proposal — 2026-11-20 (ineffective until #995 merge)
 

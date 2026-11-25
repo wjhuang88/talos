@@ -153,6 +153,10 @@ fn select_row<W: Write>(
     state: &mut CatalogBrowserState,
     row: &CatalogBrowserRow,
 ) -> Result<()> {
+    if row.provider == "amazon-bedrock" && !config.providers.contains_key(&row.provider) {
+        state.message = "For Bedrock ConverseStream, configure [providers.amazon-bedrock] in config.toml, set protocol = \"amazon-bedrock\", and supply AWS_REGION and AWS credentials through the environment.".into();
+        return Ok(());
+    }
     if row.authenticated {
         *config = ConfigStore::default_store()
             .update_config(|current| {
@@ -658,6 +662,23 @@ fn fit(text: &str, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fresh_bedrock_selection_explains_regional_setup_without_prompting_for_a_key() {
+        let mut config = Config::default();
+        let rows = build_browser_rows(&config);
+        let row = rows
+            .iter()
+            .find(|row| row.provider == "amazon-bedrock" && row.model_id == "amazon.nova-lite-v1:0")
+            .unwrap()
+            .clone();
+        let mut state = CatalogBrowserState::new(rows);
+        let mut output = Vec::new();
+        select_row(&mut output, &mut config, &mut state, &row).unwrap();
+        assert!(output.is_empty());
+        assert!(state.message.contains("AWS_REGION"));
+        assert!(!config.providers.contains_key("amazon-bedrock"));
+    }
 
     #[test]
     fn azure_rows_show_shape_source_and_lazy_token_configuration() {

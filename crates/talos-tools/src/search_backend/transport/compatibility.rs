@@ -8,6 +8,7 @@
 //! Fixed UA/language snapshots remain dormant; retries/source/default activation gated.
 
 mod admission;
+pub(in crate::search_backend) mod bing_dual;
 pub(in crate::search_backend) mod chain;
 pub(super) mod headers;
 pub(in crate::search_backend) mod invocation;

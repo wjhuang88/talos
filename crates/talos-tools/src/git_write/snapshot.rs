@@ -209,6 +209,15 @@ pub(super) struct PathIdentity {
 }
 
 impl PathIdentity {
+    #[cfg(windows)]
+    pub(super) fn matches_open_file(&self, file: &std::fs::File) -> std::io::Result<bool> {
+        let handle = std::panic::catch_unwind(|| same_file::Handle::from_file(file.try_clone()?))
+            .map_err(|_| {
+                std::io::Error::other("Windows Git file identity inspection panicked")
+            })??;
+        Ok(self.ancestors.first() == Some(&handle))
+    }
+
     /// Revalidate retained ancestors one at a time rather than constructing a
     /// second identity vector (and a second set of Windows handles).
     #[cfg(any(windows, test))]

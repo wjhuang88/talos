@@ -1,18 +1,18 @@
 # SEARCH-001-D3-T4: Prepared Dual-Host Bing Technical Integration (Offline)
 
-**Status**: In Progress / Claimed (PROPOSED, effective only after governance PR #992 merges; technical offline integration only)
+**Status**: Complete / Closed for I333 offline-only technical integration upon owner-first closeout merge; production Bing WWW remains NOT ACTIVATED
 **Type**: Technical / Test Story
 **Parent Epic**: [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md)
 **Source Issue**: [#991](https://github.com/wjhuang88/talos/issues/991)
 **Predecessor**: [SEARCH-001-D3-T3 / #957](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md), I329 T3a Complete / Closed
-**Selected Iteration**: [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md) — proposed Active / Claimed, ineffective until #992 merges
+**Selected Iteration**: [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md) — offline technical slice Complete / Closed upon owner-first closeout merge; claim #992 already effective
 **Technical decision**: Maintainer [2026-11-20 Bing GO on technical feasibility](https://github.com/wjhuang88/talos/issues/957), distinct from permission to distribute automated search use
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3-T4/#991: offline, prepared, per-invocation permission-aware Bing dual-variant request-plan integration and mock execution; **no newly active network host or production default route** |
@@ -20,10 +20,10 @@
 | Source Issue | #991 |
 | Governance Claim PR | #992 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer selected technical GO on 2026-11-20 (#957/#937); independent Agent API/Network/security review + exact-head CI/governance validators + merge CAS are mandatory. PR #992 proposed and **ineffective until merge**; single-maintainer process does not imply independent human approval. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-20 |
-| Handoff / Release Condition | Claim only effective on target-main merge; subsequent implementation must be independently reviewed and measured; #957 T3b live/default remains unclaimed and #624 Open |
+| Authorization Evidence | Technical GO #957/#937; claim #992 merged `510bfa71a43a37a8273c58df82450f233cbebb11` before source; #994 exact-head CI #4483 attempt 4 **8/8 SUCCESS**, independent Agent [APPROVE](https://github.com/wjhuang88/talos/pull/994#issuecomment-7075229507), single-maintainer authorization + merge-time CAS. No independent human approval claimed. |
+| Implementation PR | #994 MERGED, Completion Commit `c3b75e1e118dff37f29d7f028c99ac2336ba7b59`; source HEAD `bcc1014186d0ae883da7474c93a1597b989f9988` |
+| Last Updated | 2026-11-22 |
+| Handoff / Release Condition | I333 source accepted and closed only upon owner-first status publication; #991 closes after closeout merge. #957 T3b remains BLOCKED / Unclaimed; #937/#624 Open; external rights/region still unverified. |
 
 ## Goal and technical boundary
 
@@ -46,11 +46,21 @@ The existing deployed source-family sequence remains DDG Lite → Instant Answer
 
 ## Acceptance and verification
 
-- [ ] Effective distinct I333/owner claim recorded on target `main` via governance-only PR before any implementation.
-- [ ] Offline end-to-end mocks prove bounded WWW-first/CN-fallback using *both preauthorized* variants; fail closed on unprepared host, foreign redirect, access denial, HTTP 5xx, stale invocation and budget exhaustion.
-- [ ] Existing DDG-first Auto production route, schema, snapshots and permission host list remain unchanged; compare code + fixture output.
-- [ ] No new live calls/keys or dependency; locked focused/full Rust tests and applicable macOS/Linux/Windows CI, security/API/Network independent review and CAS.
-- [ ] After accepted source implementation, owner-first status closeout cites **prior source Completion Commit**. Keep actual live/default, region, rights, provider-independence residuals open.
+- [x] Effective distinct I333/owner claim recorded on target `main` via governance-only PR before any implementation.
+- [x] Offline end-to-end mocks prove bounded WWW-first/CN-fallback using *both preauthorized* variants; fail closed on unprepared host, foreign redirect, access denial, HTTP 5xx, stale invocation and budget exhaustion.
+- [x] Existing DDG-first Auto production route, schema, snapshots and permission host list remain unchanged; compare code + fixture output.
+- [x] No new live calls/keys or dependency; locked focused/full Rust tests and applicable macOS/Linux/Windows CI, security/API/Network independent review and CAS.
+- [x] After accepted source implementation, owner-first status closeout cites **prior source Completion Commit**. Keep actual live/default, region, rights, provider-independence residuals open.
+
+## Completion and native verification — 2026-11-22
+
+**Completion Commit: `c3b75e1e118dff37f29d7f028c99ac2336ba7b59`** (pre-existing `main` source merge for [implementation PR #994](https://github.com/wjhuang88/talos/pull/994); reviewed exact source HEAD `bcc1014186d0ae883da7474c93a1597b989f9988`). This is a source-implementation commit, **not** the governance closeout commit.
+
+- Claim-first: [#992](https://github.com/wjhuang88/talos/pull/992) was merged before implementation. Review: [independent Agent APPROVE](https://github.com/wjhuang88/talos/pull/994#issuecomment-7075229507) confirms no source/API/Network/security blockers; no separate natural-person approval claimed. Single-maintainer authorization and target CAS recorded in #994.
+- Private integration: both fixed Bing WWW and CN search plans preauthorized under one ToolNetworkManifest before callbacks, zero redirects and one header snapshot; 9 offline synthetic Rust tests exercise parser/admission, typed DNS/connect/refusal/source-local-timeout failover and fail-closed Network/HTTP/redirect/denied host/cancel/deadline/shared request+response budget cases. No new production sender, outbound HTTP/DNS, provider identity or Network permission.
+- Native validation: [CI #4483 attempt 4](https://github.com/wjhuang88/talos/actions/runs/44868769900) **SUCCESS, all 8 applicable jobs** including macOS, Windows workspace and Rust aggregate, Windows/Linux Desktop, governance checks. Earlier failing/cancelled attempts are retained, not waived; unrelated [Windows SQLite WAL contention diagnostic](https://github.com/wjhuang88/talos/issues/141#issuecomment-7067750909) transferred to DATA-002/#141.
+- Rollback: revert the two isolated `talos-tools/search_backend/transport/compatibility` Rust file changes. Shipped DDG Lite → Instant Answer → DDG HTML → Bing CN behavior stays unchanged; no public Tool changes or new dependencies.
+- Residual separate gates: [#957](https://github.com/wjhuang88/talos/issues/957) **T3b production/live BLOCKED / Unclaimed**, [D3/#937](https://github.com/wjhuang88/talos/issues/937) and [epic #624](https://github.com/wjhuang88/talos/issues/624) Open, historical #644 ZERO-ADMISSION unchanged. Microsoft automated-search/result/LLM use rights and mainland-China/comparator reachability remain **unverified**; E/F/G/I not unlocked.
 
 ## Required reads
 

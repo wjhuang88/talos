@@ -49,6 +49,9 @@ pub enum ProviderProtocol {
     /// Explicit Azure OpenAI transport.
     #[serde(rename = "azure-openai")]
     AzureOpenAI,
+    /// Amazon Bedrock Runtime ConverseStream.
+    #[serde(rename = "amazon-bedrock")]
+    AmazonBedrock,
 }
 
 impl ProviderProtocol {
@@ -67,6 +70,7 @@ impl std::fmt::Display for ProviderProtocol {
             Self::OpenAIChat => "openai-chat",
             Self::OpenAIResponses => "openai-responses",
             Self::GoogleGemini => "google-gemini",
+            Self::AmazonBedrock => "amazon-bedrock",
             Self::AzureOpenAI => "azure-openai",
         })
     }
@@ -367,6 +371,9 @@ pub enum SearchBackendConfig {
     Auto,
     /// Explicit zero-key DuckDuckGo selection.
     DuckDuckGo,
+    /// Explicit opt-in Bing WWW-first/CN-fallback; Auto remains DDG-first/CN-only.
+    #[serde(rename = "bing-dual")]
+    BingDual,
     /// Explicit premium Tavily selection; credential is resolved separately.
     Tavily,
     /// Explicit caller-configured SearXNG selection.

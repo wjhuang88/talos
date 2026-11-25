@@ -630,6 +630,8 @@ variable, read at dispatch without automatic login or refresh. See the
 [SDK migration contract](docs/reference/RUNTIME-SDK-CONTRACT.md).
 Full acceptance remains pending; no live Azure service validation or release is claimed.
 
+The Bedrock development branch supports ConverseStream with an explicit `amazon-bedrock` protocol. Set `AWS_REGION` and supply AWS environment credentials to the Talos process. See the [Bedrock configuration example](docs/reference/PROVIDER-PROTOCOLS.md#amazon-bedrock-conversestream).
+
 A frozen Azure catalog audit permits Responses inference for 22 exact packaged model pairs with a valid explicit v1 resource profile; explicit protocol and body choices win.
 
 ## Run Talos

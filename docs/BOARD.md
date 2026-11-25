@@ -2,9 +2,21 @@
 
 Complete / Closed. Desktop shell approval and execution resolve the same workspace. Implementation commit `4462a35b` merged in #990. [Task and acceptance](tasks/desktop-relative-workspace-approval.md)
 
-## SEARCH-001-D3-T4 / I333 — Bing technical GO; prepared dual-host integration claim proposed (2026-11-20)
+## SEARCH-001-D2-T3 / I337 — proposed offline MCP evidence harness
 
-[Canonical owner](backlog/active/SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) / [I333](iterations/I333-search-bing-prepared-dual-host-integration.md) / [Issue #991](https://github.com/wjhuang88/talos/issues/991) / [governance PR #992](https://github.com/wjhuang88/talos/pull/992). **PROPOSED Active / Claimed, ineffective until accepted claim merge**. New separate work slice targets private, **offline/mocked prepared** WWW-first/CN fallback with both endpoints authorized up front; no production traffic or default/Network permission change. Existing I329 T3a is Completed/Closed; #957 T3b real/default remains blocked/unclaimed pending independent rights and real-region evidence. Existing Bing technical candidate is GO, not a license or second independent native provider. #624 Open and #644 ZERO-ADMISSION remain unchanged.
+[Owner](backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](iterations/I337-search-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): In Progress / Claimed PROPOSED via [#1016](https://github.com/wjhuang88/talos/pull/1016), ineffective until merge. Offline-only synthetic search protocol/replay, no external vendor calls, default routing or new provider. I331 documentary slice remains closed; #848/#624 stay open for admission and real-region evidence.
+
+## GIT-ENV-001 / #1004 — Scoop Git environment admission
+
+[Owner](backlog/active/GIT-ENV-001-scoop-install-root.md). Complete / Closed via #1007, f4eb947c. Git 2.36.1 query support remains with #919.
+
+## SEARCH-001-D3-T5 / I335 — Complete / Closed upon owner-first closeout (explicit opt-in only)
+
+[Owner](backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](iterations/I335-search-bing-dual-runtime.md) / [Issue #1001](https://github.com/wjhuang88/talos/issues/1001): governance claim #1002 effective, [source PR #1003](https://github.com/wjhuang88/talos/pull/1003) **Completion Commit `bab2bdf31fc8200758397d38077dab57b9dd1aa4`**. Exact-head [CI #45160764389](https://github.com/wjhuang88/talos/actions/runs/45160764389) **8/8 SUCCESS**, Copilot independent [APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725), merge-time CAS. Real preapproved bounded `SearchTransport` with explicit `backend = "bing-dual"` opt-in, WWW-first/CN only on typed source-local outage, fail-closed security/proxy/budget/cancel; original DDG-first/CN-only Auto and public schema unchanged. Technical slice closes on this owner-first documentation publication and #1001 Issue synchronization. **No** vendor/output rights or default/live activation: [#1000](https://github.com/wjhuang88/talos/issues/1000) remains unverified, #957 T3b blocked, #937/#624 remain Open.
+
+## SEARCH-001-D3-T4 / I333 — Complete / Closed upon owner-first closeout (offline-only)
+
+[Canonical owner](backlog/active/SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) / [I333](iterations/I333-search-bing-prepared-dual-host-integration.md) / [#991](https://github.com/wjhuang88/talos/issues/991): effective claim #992 merged before implementation; [source PR #994](https://github.com/wjhuang88/talos/pull/994) **Completion Commit `c3b75e1e118dff37f29d7f028c99ac2336ba7b59`**, exact-head [CI #4483](https://github.com/wjhuang88/talos/actions/runs/44868769900) attempt 4 **8/8 SUCCESS**, [independent Agent APPROVE](https://github.com/wjhuang88/talos/pull/994#issuecomment-7075229507) and single-maintainer merge-time CAS. Private prepared dual-Bing-host WWW-first/CN-fallback integration and **9 offline synthetic Rust tests** are Complete/Closed only upon owner-first closeout publication. No production WWW route, vendor rights/region or new provider admission. #957 T3b BLOCKED / Unclaimed; #937/#624 Open; #644 ZERO-ADMISSION unchanged. Separate Windows WAL contention tracked under DATA-002/#141.
 
 ## SEARCH-001-A / I288 + SEARCH-001-B / I292 — historical owner-first claim closure (2026-11-19)
 
@@ -30,7 +42,7 @@ No default background continuation or product release authorization.
 
 ## Azure C / PROVIDER-008-C
 
-[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 is Complete / Closed via #978 (d1e07b59), CI4411 8/8. A/B remain Complete; D and #724 remain unfinished.
+[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 is Complete / Closed via #978 (d1e07b59), CI4411 8/8. All four child implementations are merged, ending with Bedrock #1009.
 
 # Talos Board
 
@@ -57,9 +69,16 @@ Recovery PR #917, approval history, edit locations and background retain separat
 
 [SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): claim [#943](https://github.com/wjhuang88/talos/pull/943) merged; bounded test implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged at Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` after exact-head CI43428872719 8/8, independent review and CAS. Five synthetic-only cases characterize ad/organic false positive, DOM drift, unadmitted new Bing hosts and root-reachability/query-403 distinction. Parser false-positive **not fixed**; new Bing hosts, real regional reachability or provider rights not admitted. #937/#624 remain Open; #941 close only after owner-first record merges.
 
-## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
+## GIT-COMPAT-001 / I324 — targeted old-Git query compatibility (Active; native acceptance failed)
 
-[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only [claim #920](https://github.com/wjhuang88/talos/pull/920) and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
+[November 21 native handoff](reference/WINDOWS-VALIDATION-2026-11-21-I324.md), tested
+`2bbd3c34`: official MinGit and installed Scoop Git 2.36.1 confirm five unsupported
+var forms and unsupported target-tree source option. Fixed test-fixture read-only
+cleanup; both matrix reruns exit 0. Format and 15 candidate tests pass; original
+17 MiB Checkout/Commit preparation still fails on environment guard. Product
+acceptance remains failed; no permission change or Complete claim.
+
+[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): [claim #920](https://github.com/wjhuang88/talos/pull/920) effective at `067dd3d4`; Draft #928 and Proposed ADR review #931 remain unmerged. **2026-11-19 maintainer correction:** retain compatible approved Git CLI and replace only unsupported query forms (initially `git var GIT_ATTR_SYSTEM/GLOBAL`), not the entire preflight; the older all-gix/zero-CLI design is superseded. [November 17 native Windows evidence](reference/WINDOWS-VALIDATION-2026-11-17-I324.md), exact candidate `71c923b9`: 12 candidate tests pass, original Git 2.36 suite 272 pass / 113 fail; controlled environment 305 pass / 80 fail. Actual prepared large Checkout/Commit acceptance failed; The Windows gitdir conditional candidate was added and passed remote CI #4415 8/8, but real 2.36.1 full Checkout/Commit, new substitute-path child evidence and independent security review remain open. ADR-089 authority and separate snapshot/TUI Review owners are unchanged.
 
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
@@ -102,10 +121,9 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 [STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I328](iterations/I328-store-002-default-local-composition.md) / [#670](https://github.com/wjhuang88/talos/issues/670): governance #955 effective; [implementation #956](https://github.com/wjhuang88/talos/pull/956) merged **Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`**, [exact-head CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951) **8/8 Success**, independent API/protected review and merge CAS. **I328 E Complete / Closed**, released E owner; opt-in local-default Session/Pending/Todo/Memory/Evolution/Exploration selection only. No Host/SDK/default/SQL/schema/format change. Parent #670 stays **Open for F**, not fully Complete; #897 E2/E3 requires a separate effective Host implementation claim, not implicitly activated.
 
-## ARCH-035 / I334 E3a — proposed CLI actor and SDK composition parity claim #995 (ineffective until merge)
+## ARCH-035 / I334 E3a — effective claim, partial accepted CLI/SDK, active startup test review
 
-[ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I334](iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) / [#897](https://github.com/wjhuang88/talos/issues/897): existing I330 E2 **Complete / Closed** via #979 implementation Completion Commit `21589346d99263c5675ad0b648df684801d2e861` and owner-first #987 merge `9f07fc6b`. **Atomic governance PR [#995](https://github.com/wjhuang88/talos/pull/995) proposes E3a Active / Claimed, ineffective until reviewed target-main merge**; actor @wjhuang88. Limited CLI/TUI canonical Session actor and embedded SDK host-composition no-op/delegate and conformance, Desktop Create/Existing/unbound read-only inventory. No E3b/Desktop migration, E4 full parity, STORE-002 F, ServerHost, default behavior, permission, schema, or E3a implementation. #897 and #670 remain Open.
-
+[ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I334](iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) / [#897](https://github.com/wjhuang88/talos/issues/897): **effective E3a claim #995** (merged `08f2a41c`), delivery **Active / Review, Claim State Claimed**, actor @wjhuang88. Accepted partial source [#996](https://github.com/wjhuang88/talos/pull/996) `51b6e54` and [#998](https://github.com/wjhuang88/talos/pull/998) `ce6c56d` (CI #4561 8/8 and independent code APPROVE) cover canonical CLI actor/Todo callback and external `local-storage` SDK Cargo-root lock, without changing production defaults or authorities. New isolated default-versus-custom startup reconciliation test in [Draft PR #1010](https://github.com/wjhuang88/talos/pull/1010) is **candidate-only, unaccepted until native CI and review**. Permission/receipt/cancel/fault parity remains open; no E3a Completion Commit. E3b Desktop, E4 broad conformance, STORE-002 F, ServerHost separately gated; parents #897 and #670 **OPEN**.
 ## ARCH-035 / I330 E2 — Complete / Closed; parent #897 Open / Blocked / Released
 
 [ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I330](iterations/I330-arch-035-e2-host-storage-selection.md) / [#897](https://github.com/wjhuang88/talos/issues/897): governance #975 merged/effective `799e3c35`; opt-in runtime-facing Host durable local selection [implementation #979](https://github.com/wjhuang88/talos/pull/979) **MERGED**, **Completion Commit `21589346d99263c5675ad0b648df684801d2e861`**, [exact-head native CI #4412](https://github.com/wjhuang88/talos/actions/runs/44457476055) **8/8 SUCCESS**, independent exact-head [Copilot APPROVE](https://github.com/wjhuang88/talos/pull/979#issuecomment-6999596024), single-maintainer [authorization/CAS](https://github.com/wjhuang88/talos/pull/979#issuecomment-7002828221). I330 E2 **Complete / Closed**, former E2 claim Released at parent. Built on accepted STORE-002 E `LocalStorageProfile`; no CLI/TUI/Desktop/SDK default change, SQL/schema/format change or ServerHost. E3 multi-host integration, E4 cross-host equivalence and #670 F remain **unclaimed/separately gated**; parent #897 **OPEN / Blocked / Released** and #670 OPEN. Historical native CI #4383 failed an incorrect new test TLOG path assertion; repaired #4402 and final #4412 both 8/8 green; project governance 0 warnings, collaboration PASS with 1 unrelated SEARCH intake warning.
@@ -280,7 +298,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Explicit search provider overrides / SEARCH-001-H | Complete / Closed | [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / [I314](iterations/I314-search-explicit-overrides.md) / #832 | Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842); CI3800 8/8, independent security review no blockers, CAS passed. Parent #624 and E/F/G/I remain separate. |
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
 | Actor checkpoint/history / T5 | Complete / Closed | [I313](iterations/I313-model-checkpoint-history.md) | Completion Commit `322574bc9707492ea6e9d5232794f73e687071d9` (#837); CI41608342151 and independent API/privacy/storage/security review passed. Later quality repairs are separately owned by QUALITY-001. |
-| Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
+| Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. All four child implementations are merged, ending with Bedrock #1009. |
 | Windows known-resource acceptance | Complete / Closed | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #716 merged `b5b8241e`; I305/TEST004 cite existing Completion Commit. CI3221 all6jobs and protected review/CAS passed; only known-resource criterion closed, #717 residual open. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |
 | Embedded Skill progressive disclosure | Complete / Closed | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | #721 merged as `6d72975e`; exact-head CI, independent security/API review and CAS passed. |
@@ -446,7 +464,7 @@ owner for scope, acceptance and complete active/review/planned inventory.
 PROVIDER-008-B / #810 / I310 is Complete / Closed.
 Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md); implementation #838 merged
 as `dbcf6163f34d73def923484ad409814fd4a98039`. CI4046 all eight jobs passed; independent technical/document
-review and merge CAS passed. Azure C, Bedrock D and parent #724 remain open.
+review and merge CAS passed. All four child implementations are merged, ending with Bedrock #1009.
 
 ## Session-owned worktrees / WORKTREE-001
 
@@ -470,4 +488,12 @@ interaction logic while retaining Talos ingestion and permission boundaries.
 
 ## PROVIDER-008-D / I332
 
-Bedrock #985 proposed Active / Claimed upon governance merge. Owner: PROVIDER-008-D-amazon-bedrock.md. ADR-107. Parent #724 open.
+Bedrock #985 / I332 Complete / Closed via #1009. Completion Commit: 1745cd3c4d29dd375e680822ffc86f9cc6a3379e. All four #724 protocol families are complete.
+
+## PROVIDER-003-A / I336
+
+Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
+
+## PROVIDER-003-B / I338
+
+[Owner](backlog/active/PROVIDER-003-B-shared-credential-lifecycle.md) / [I338](iterations/I338-provider003b-shared-credential-lifecycle.md) / [#1024](https://github.com/wjhuang88/talos/issues/1024): In Progress / Claimed PROPOSED via [#1025](https://github.com/wjhuang88/talos/pull/1025), ineffective until target-main merge. Shared credential lifecycle, bounds, redaction and legacy compatibility only; independent protected review, both validators, exact-head CI and CAS required. No implementation yet; C–G separate.

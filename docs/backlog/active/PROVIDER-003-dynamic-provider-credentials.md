@@ -199,7 +199,7 @@ When a child implementation is selected:
 
 ## Acceptance For Epic Governance
 
-- [ ] PROVIDER-003-A owner document and ADR/threat-model review are accepted before product code.
+- [x] PROVIDER-003-A owner document and ADR/threat-model review are accepted before product code.
 - [ ] Every selected child has its own owner, collaboration claim, iteration, exact base, validation
       matrix, and residual destination.
 - [ ] Shared capability changes occur only in A/B/C and are not smuggled through a provider-specific
@@ -223,3 +223,11 @@ When a child implementation is selected:
 Partial implementation remains owned by the corresponding child Story. New provider mechanisms,
 credential stores, OS keychain support, browser automation, or broader request-replay semantics
 require separate owners or an explicit update to the decomposition before implementation.
+
+## PROVIDER-003-A / I336
+
+Complete / Closed. ADR-108 and its threat model merged in #1020 (2dcbfb6090aaae3f2f94e5930d28bb56698eea3d) after independent Agent security review and exact-head CI4606 (four applicable jobs passed, four scope skips). #1021 records the sole maintainer’s authorization. Parent #132 remains open for separately claimed implementation slices B–G.
+
+## PROVIDER-003-B / I338
+
+[Child owner](PROVIDER-003-B-shared-credential-lifecycle.md) / [I338](../../iterations/I338-provider003b-shared-credential-lifecycle.md) / [#1024](https://github.com/wjhuang88/talos/issues/1024): #1025 proposes In Progress / Claimed shared lifecycle only, effective on main merge. ADR-108 governs; C final-request authorization/replay and D–G acquisition remain separate. Parent remains Refinement Epic / Unclaimed and #132 open. No product code in this claim.

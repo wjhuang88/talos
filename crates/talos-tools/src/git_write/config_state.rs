@@ -1751,6 +1751,15 @@ fn configured_path_value_inner(
     Ok(Some(PathBuf::from(value)))
 }
 
+// Test-only access to the actual origin-bearing parser: parse_host alone
+// accepts record-only data and cannot validate the Git --show-origin wire format.
+#[cfg(test)]
+pub(super) fn parse_origins_for_tests(
+    bytes: &[u8],
+) -> Result<(BTreeMap<Vec<u8>, Vec<Option<Vec<u8>>>>, BTreeSet<PathBuf>), GitToolError> {
+    parse_origins(bytes)
+}
+
 fn parse_origins(bytes: &[u8]) -> Result<(Values, BTreeSet<PathBuf>), GitToolError> {
     if bytes.is_empty() {
         return Ok((BTreeMap::new(), BTreeSet::new()));

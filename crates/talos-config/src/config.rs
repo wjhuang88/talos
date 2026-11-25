@@ -237,6 +237,12 @@ impl Config {
                 })
     }
 
+    fn uses_dispatch_credentials(&self) -> bool {
+        self.provider_protocol() == ProviderProtocol::AmazonBedrock
+            || self.uses_vertex_adc()
+            || self.uses_azure_supplied_token()
+    }
+
     /// Returns the API key for the current provider.
     ///
     /// Resolution order:
@@ -248,11 +254,10 @@ impl Config {
     ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
     ///    after `OPENAI_API_KEY` so existing setups are unaffected.
     ///
-    /// Explicit Vertex ADC and Azure supplied-token profiles return an empty string
-    /// because its credentials are acquired later by the admitted request transport.
+    /// Vertex ADC, Azure supplied tokens and Bedrock SigV4 use credentials
+    /// acquired by their selected transport at dispatch.
     pub fn api_key(&self) -> Result<String, ConfigError> {
-        // Legacy host API: Vertex uses request-owned ADC, so there is no API-key secret.
-        if self.uses_vertex_adc() || self.uses_azure_supplied_token() {
+        if self.uses_dispatch_credentials() {
             return Ok(String::new());
         }
         let provider = self.active_provider_config();
@@ -536,11 +541,17 @@ impl Config {
             ));
         }
 
+        if self.provider_protocol() == ProviderProtocol::AmazonBedrock
+            && self.configured_endpoint_url().is_some()
+        {
+            return Err(ConfigError::InvalidConfig(
+                "Bedrock requires its regional service endpoint".into(),
+            ));
+        }
         self.resolve_provider_endpoint()?;
         let provider = self.active_provider_config();
         if self.providers.contains_key(&self.provider)
-            && !self.uses_vertex_adc()
-            && !self.uses_azure_supplied_token()
+            && !self.uses_dispatch_credentials()
             && provider.api_key.is_none()
             && provider.api_key_env.is_none()
         {
@@ -651,6 +662,15 @@ impl Config {
     pub fn model_authentication_configured(&self, provider: &str, model: &str) -> bool {
         let protocol = self.resolve_model_protocol(provider, model).protocol;
         let configured = self.providers.get(provider);
+        if protocol == ProviderProtocol::AmazonBedrock {
+            return configured.is_some_and(|profile| {
+                profile.base_url.is_none()
+                    && profile
+                        .models
+                        .get(model)
+                        .is_none_or(|entry| entry.base_url.is_none())
+            });
+        }
         // Supplied tokens are resolved at dispatch, without unrelated API-key fallback.
         if protocol == ProviderProtocol::AzureOpenAI
             && let Some(profile) = configured.and_then(|config| config.azure.as_ref())
@@ -956,4 +976,33 @@ fn new_provider_overrides(name: &str) -> ProviderConfig {
     let mut provider = builtin_provider_config(name).unwrap_or_default();
     provider.protocol = ProviderProtocol::Unspecified;
     provider
+}
+
+#[cfg(test)]
+mod bedrock_host_tests {
+    use super::*;
+    #[test]
+    fn bedrock_defers_credentials_and_rejects_endpoint_overrides() {
+        let mut config = Config {
+            provider: "regional".into(),
+            model: "example".into(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            config.provider.clone(),
+            ProviderConfig {
+                protocol: ProviderProtocol::AmazonBedrock,
+                ..Default::default()
+            },
+        );
+        assert!(config.validate().is_ok());
+        assert_eq!(config.api_key().unwrap(), "");
+        assert!(config.model_authentication_configured("regional", "example"));
+        let profile = config.providers.get_mut("regional").unwrap();
+        profile.api_key = Some("unrelated".into());
+        profile.base_url = Some("https://example.org".into());
+        assert_eq!(config.api_key().unwrap(), "");
+        assert!(config.validate().is_err());
+        assert!(!config.model_authentication_configured("regional", "example"));
+    }
 }

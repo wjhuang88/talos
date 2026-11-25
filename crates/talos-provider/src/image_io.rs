@@ -71,8 +71,16 @@ pub(crate) fn append_gemini_ephemeral_images(
     append_images(body, images, ImageWire::Gemini)
 }
 
+pub(crate) fn append_bedrock_ephemeral_images(
+    body: &mut serde_json::Value,
+    images: Vec<talos_core::provider::EphemeralImage>,
+) -> talos_core::provider::ProviderResult<Option<std::time::Instant>> {
+    append_images(body, images, ImageWire::Bedrock)
+}
+
 #[derive(Clone, Copy)]
 enum ImageWire {
+    Bedrock,
     Chat,
     Anthropic,
     Responses,
@@ -111,7 +119,9 @@ fn append_images(
         deadline =
             Some(deadline.map_or(expires, |current: std::time::Instant| current.min(expires)));
         let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-        blocks.push(if matches!(wire, ImageWire::Gemini) {
+        blocks.push(if matches!(wire, ImageWire::Bedrock) {
+            serde_json::json!({"image":{"format":"png","source":{"bytes":encoded}}})
+        } else if matches!(wire, ImageWire::Gemini) {
             serde_json::json!({"inlineData":{"mimeType":"image/png","data":encoded}})
         } else if anthropic {
             serde_json::json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":encoded}})
@@ -133,7 +143,7 @@ fn append_images(
         .ok_or_else(|| {
             ProviderError::InvalidResponse("ephemeral image request unavailable".into())
         })?;
-    if anthropic
+    if (anthropic || matches!(wire, ImageWire::Bedrock))
         && messages
             .last()
             .is_some_and(|message| message["role"] == "user")
@@ -146,7 +156,7 @@ fn append_images(
             })?;
         match content {
             serde_json::Value::Array(content) => content.extend(blocks),
-            serde_json::Value::String(text) => {
+            serde_json::Value::String(text) if anthropic => {
                 let mut content_blocks = vec![serde_json::json!({"type":"text","text":text})];
                 content_blocks.extend(blocks);
                 *content = serde_json::Value::Array(content_blocks);

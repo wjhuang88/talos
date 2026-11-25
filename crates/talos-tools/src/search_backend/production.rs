@@ -21,6 +21,7 @@ use super::composition::SearchCompositionConfiguration;
 use super::router::SearchRouterPolicy;
 use super::router_tool::GuardedSearchRouterTool;
 use super::selection::SearchBackendSelection;
+use super::transport::compatibility::bing_dual::tool::GuardedBingDualSearchTool;
 use super::transport::compatibility::{searxng::SearXngConfiguration, tavily::TavilyConfiguration};
 use super::transport::{TransportError, TransportLimits};
 
@@ -80,6 +81,11 @@ fn selected_configuration(
 ) -> Result<SearchCompositionConfiguration, SearchToolConfigurationError> {
     let (selection, tavily, searxng) = match search {
         SearchToolConfiguration::Auto => (SearchBackendSelection::Auto, None, None),
+        SearchToolConfiguration::BingDual => {
+            // The explicit Bing tool has its own dedicated bounded prepared Network invocation,
+            // never the default compatibility/router candidate set.
+            return Err(SearchToolConfigurationError::TransportPolicy);
+        }
         SearchToolConfiguration::DuckDuckGo => (
             SearchBackendSelection::explicit(SearchBackendId::DuckDuckGo),
             None,
@@ -127,6 +133,17 @@ fn selected_configuration(
 pub(crate) fn production_search_router_tool_with_search_configuration(
     search: SearchToolConfiguration,
 ) -> Result<Arc<dyn AgentTool>, SearchToolConfigurationError> {
+    if matches!(&search, SearchToolConfiguration::BingDual) {
+        let limits = TransportLimits::new(
+            Duration::from_secs(45),
+            4, // two fixed HTTPS endpoints, two physical units per proxied send
+            PRODUCTION_SEARCH_MAX_BYTES,
+        )
+        .map_err(|_| SearchToolConfigurationError::TransportPolicy)?;
+        let tool = GuardedBingDualSearchTool::new(limits)
+            .map_err(|_| SearchToolConfigurationError::TransportPolicy)?;
+        return Ok(Arc::new(tool));
+    }
     let explicit_auto_fallback = matches!(
         &search,
         SearchToolConfiguration::Tavily {
@@ -333,5 +350,41 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(result.content, "search_prepared_invocation_required");
+    }
+
+    #[test]
+    fn explicit_bing_dual_requires_explicit_intent_and_scopes_both_hosts() {
+        let auto = selected_configuration(&SearchToolConfiguration::Auto).expect("auto");
+        assert!(
+            !auto
+                .scope()
+                .endpoints()
+                .iter()
+                .any(|endpoint| endpoint.host() == "www.bing.com")
+        );
+        let tool = production_search_router_tool_with_search_configuration(
+            SearchToolConfiguration::BingDual,
+        )
+        .expect("bounded opt-in Bing tool");
+        let prepared = tool
+            .prepare_network_invocation(&serde_json::json!({
+                "query": "opt in",
+                "max_results": 2,
+                "include_snippets": true
+            }))
+            .expect("prepare")
+            .expect("protected invocation");
+        let hosts: Vec<_> = prepared
+            .manifest()
+            .scope()
+            .endpoints()
+            .iter()
+            .map(|x| x.host())
+            .collect();
+        assert!(hosts.len() >= 2);
+        assert!(hosts.contains(&"www.bing.com"));
+        assert!(hosts.contains(&"cn.bing.com"));
+        assert_eq!(prepared.manifest().scope().redirect_limit(), 0);
+        assert_eq!(tool.name(), "web_search");
     }
 }
