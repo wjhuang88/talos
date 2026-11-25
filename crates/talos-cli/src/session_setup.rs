@@ -1002,3 +1002,160 @@ mod fork_tests {
         }));
     }
 }
+
+#[cfg(test)]
+mod i334_selection_tests {
+    use super::*;
+    use clap::Parser;
+    use std::time::{Duration, UNIX_EPOCH};
+    use talos_core::message::Message;
+
+    #[test]
+    fn i334_cli_selection_preserves_session_identity_and_workspace_scope() {
+        let root = tempfile::tempdir().expect("isolated root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = root.path().join("workspace");
+        let other_workspace = root.path().join("other");
+        std::fs::create_dir(&workspace).expect("workspace");
+        std::fs::create_dir(&other_workspace).expect("other workspace");
+        let workspace = canonical_workspace_root(&workspace);
+        let other_workspace = canonical_workspace_root(&other_workspace);
+
+        let seed = |workspace: &str, content: &str, seconds: u64| {
+            let session = manager
+                .create_session("i334", workspace)
+                .expect("create session");
+            session
+                .append(&Message::User {
+                    content: content.into(),
+                })
+                .expect("append message");
+            manager.update_index(&session).expect("index session");
+            // Set distinct modification times instead of sleeping or relying
+            // on filesystem timestamp resolution or directory iteration order.
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(&session.file_path)
+                .expect("open transcript for timestamp")
+                .set_modified(UNIX_EPOCH + Duration::from_secs(seconds))
+                .expect("set fixture timestamp");
+            session
+        };
+        let older = seed(&workspace, "older local fact", 1_700_000_000);
+        let latest = seed(&workspace, "latest local fact", 1_700_000_010);
+        let foreign = seed(&other_workspace, "other workspace fact", 1_700_000_020);
+        let original_bytes = [&older, &latest, &foreign]
+            .map(|session| session.snapshot_bytes().expect("original transcript"));
+        let original_ids = [&older, &latest, &foreign].map(|session| {
+            session.read_entries().expect("original entries")[0]
+                .id
+                .clone()
+        });
+
+        let explicit_id = older.id.to_string();
+        for (cli, selection, expected) in [
+            (
+                Cli::parse_from(["talos", "--session", explicit_id.as_str(), "--continue"]),
+                ResumeSelection::Latest,
+                &older,
+            ),
+            (
+                Cli::parse_from(["talos", "--continue"]),
+                ResumeSelection::Disabled,
+                &latest,
+            ),
+            (
+                Cli::parse_from(["talos", "--resume"]),
+                ResumeSelection::Latest,
+                &latest,
+            ),
+        ] {
+            let selected =
+                resolve_session_for_workspace(&manager, &workspace, "i334", &cli, selection, true)
+                    .expect("resolve actual CLI selection");
+            let direct = manager.get_session(&expected.id).expect("direct session");
+            assert_eq!(selected.id, expected.id);
+            assert_eq!(selected.file_path, expected.file_path);
+            assert_eq!(selected.file_path, direct.file_path);
+            assert_eq!(selected.file_extension(), "tlog");
+            assert_eq!(
+                selected.snapshot_bytes().expect("selected bytes"),
+                direct.snapshot_bytes().expect("direct bytes")
+            );
+            assert_eq!(
+                selected.read_entries().expect("selected entries")[0].id,
+                expected.read_entries().expect("original entries")[0].id
+            );
+        }
+
+        let indexed = manager.list_recent(10).expect("original index");
+        assert_eq!(indexed.len(), 3);
+        assert_eq!(manager.list_sessions().expect("all sessions").len(), 3);
+        for (index, session) in [&older, &latest, &foreign].into_iter().enumerate() {
+            assert_eq!(
+                session.snapshot_bytes().expect("unchanged transcript"),
+                original_bytes[index]
+            );
+            assert_eq!(
+                session.read_entries().expect("unchanged entries")[0].id,
+                original_ids[index]
+            );
+            assert!(
+                indexed
+                    .iter()
+                    .any(|row| row.id == session.id && row.message_count == 1)
+            );
+        }
+    }
+
+    #[test]
+    fn i334_cli_selection_errors_and_empty_resume_do_not_create_session() {
+        let root = tempfile::tempdir().expect("isolated root");
+        let sessions = root.path().join("not-created");
+        let manager = SessionManager::with_dir(sessions.clone());
+        let workspace = canonical_workspace_root(root.path());
+        let missing = Uuid::new_v4().to_string();
+        for id in ["not-a-uuid", missing.as_str()] {
+            let cli = Cli::parse_from(["talos", "--session", id, "--continue"]);
+            let error = resolve_session_for_workspace(
+                &manager,
+                &workspace,
+                "i334",
+                &cli,
+                ResumeSelection::Latest,
+                true,
+            )
+            .expect_err("explicit invalid or missing ID must not fall back");
+            assert!(matches!(
+                error.downcast_ref::<talos_session::SessionError>(),
+                Some(talos_session::SessionError::SessionNotFound(_))
+            ));
+            assert!(!sessions.exists(), "explicit failure creates no store");
+        }
+
+        for (cli, selection) in [
+            (Cli::parse_from(["talos"]), ResumeSelection::Latest),
+            (
+                Cli::parse_from(["talos", "--continue"]),
+                ResumeSelection::Latest,
+            ),
+            (
+                Cli::parse_from(["talos", "--resume"]),
+                ResumeSelection::Latest,
+            ),
+            (
+                Cli::parse_from(["talos", "--resume"]),
+                ResumeSelection::Prompt,
+            ),
+        ] {
+            let deferred =
+                resolve_session_for_workspace(&manager, &workspace, "i334", &cli, selection, true)
+                    .expect("empty workspace selects deferred session");
+            assert!(!deferred.persisted);
+            assert!(deferred.file_path.starts_with(&sessions));
+            assert_eq!(deferred.file_extension(), "tlog");
+            assert!(!deferred.file_path.exists());
+            assert!(!sessions.exists(), "selection alone creates no store");
+        }
+    }
+}
