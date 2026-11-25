@@ -345,3 +345,7 @@ target/ui-approval-integrated-preflight-20261117.log and source-manifest JSON.
 Old CI43998984637 was superseded; normal cancel remained live, authorized force-cancel
 confirmed completed/cancelled. New exact-head CI still required. No installation,
 source-session rewrite, default continuation or Complete claim.
+
+## 2026-11-26 recovery regression follow-up
+
+Commit dfd2736b adds four CLI/TUI regressions under the existing queue, separator and terminal lifecycle scope. The CLI case covers running and cancelling turns. The TUI cases cover history spacing, preview allocation and animation through intermediate tool events. [Reconciliation record](2026-11-11-session-recovery-handoff.md)
