@@ -6,7 +6,7 @@
 
 - 会话恢复与检查点准入由 #974、#983 交付；原宿主复验得到 Applied，记录的 token 量从 868878 降至 117812，原始 TLOG 前缀和 32 个归档保留。
 - Desktop 相对工作区审批由 #990 交付，#997 回填验收。后台续跑由 #1030 合入；实现 a37f9f36 的安装版覆盖成功、失败、超时和续跑期间第二次用户输入。第四项验证了第二个 shell 调用的独立审批和终端答复。提供商为本地合成服务，shell 为真实子进程。
-- SESSION-UI-001 在 dfd2736b 补入四个原现场回归：运行和取消期间的进度错误保留排队正文直至权威终态、长预览下用户历史间距、活动回合动画、用户消息与后续正文的空行。另两个候选测试在主线已有同名覆盖。原生产实现见 #962。复验运行 talos-cli 的 progress_error_keeps_processing_and_queue_until_authoritative_failure 以及 talos-tui 全部库测试。
+- SESSION-UI-001 在 dfd2736b 补入四个原现场回归：运行和取消期间的进度错误保留排队正文直至权威终态、不同终端高度下用户历史与实时预览的间距、活动回合动画、用户消息与后续正文的空行。另两个候选测试在主线已有同名覆盖。原生产实现见 #962。复验运行 talos-cli 的 progress_error_keeps_processing_and_queue_until_authoritative_failure 以及 talos-tui 全部库测试。
 - 保留 main 上更新的双语 README、ADR 和 Board。各业务任务继续以原 owner 为准。Python 字节码属于生成物。
 
 ## 后续任务与验收
