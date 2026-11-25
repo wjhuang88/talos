@@ -1,3 +1,7 @@
+## BG-CONTINUE-001 — default background continuation
+
+[Owner](tasks/background-job-default-continuation.md). Complete upon merge of #1030. Installed Linux CLI passed success, failure, timeout and overlapping user input with separate tool approval. Completion Commit: a37f9f36.
+
 ## Desktop relative workspace approval (2026-11-21)
 
 Complete / Closed. Desktop shell approval and execution resolve the same workspace. Implementation commit `4462a35b` merged in #990. [Task and acceptance](tasks/desktop-relative-workspace-approval.md)

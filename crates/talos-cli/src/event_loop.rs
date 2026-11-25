@@ -10,7 +10,6 @@ use talos_core::background_job::BackgroundJobTerminalSummary;
 use talos_core::session::{SessionEvent, SessionOp, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{Session, SessionManager};
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::approval::{ApprovalPrompt, TerminalApprovalRequest};
@@ -31,6 +30,8 @@ pub(crate) enum AppEvent {
     UserInput(String),
     UserInterrupt,
     ApprovalRequested(Box<TerminalApprovalRequest>),
+    TurnStarted(String),
+    TurnFinished(String, TurnCompletionStatus),
     AgentTextDelta(String),
     AgentToolCall {
         id: String,
@@ -45,6 +46,7 @@ pub(crate) enum AppEvent {
     BackgroundJobTerminal(BackgroundJobTerminalSummary),
     AgentCompleted,
     AgentError(String),
+    SubmissionRejected(String),
     /// Fork completed with the new session ID.
     ForkCompleted {
         operation_id: uuid::Uuid,
@@ -56,7 +58,7 @@ pub(crate) enum AppState {
     WaitingForInput,
     AgentRunning {
         cancel_token: CancellationToken,
-        task_handle: JoinHandle<()>,
+        turn_id: Option<String>,
     },
     ForkPending {
         operation_id: uuid::Uuid,
@@ -165,8 +167,33 @@ impl EventLoop {
             generation: runtime_generation,
         };
         tokio::spawn(async move {
-            while let Some(session_event) = eq_rx.recv().await {
+            let mut approvals_open = true;
+            loop {
+                let session_event = tokio::select! {
+                    biased;
+                    event = eq_rx.recv() => match event {
+                        Some(event) => event,
+                        None => break,
+                    },
+                    request = approval_rx.recv(), if approvals_open => {
+                        if let Some(request) = request {
+                            if event_tx_forward.send(ApprovalRequested(Box::new(request))).is_err() {
+                                break;
+                            }
+                        } else {
+                            approvals_open = false;
+                        }
+                        continue;
+                    }
+                };
                 match session_event {
+                    SessionEvent::TurnEvent {
+                        turn_id,
+                        payload: TurnEventPayload::Started,
+                        ..
+                    } => {
+                        let _ = event_tx_forward.send(AppEvent::TurnStarted(turn_id));
+                    }
                     SessionEvent::TurnEvent {
                         payload:
                             TurnEventPayload::Progress {
@@ -203,20 +230,12 @@ impl EventLoop {
                         });
                     }
                     SessionEvent::TurnEvent {
+                        turn_id,
                         payload: TurnEventPayload::Completed { status },
                         ..
-                    } => match status {
-                        TurnCompletionStatus::Success { .. } => {
-                            let _ = event_tx_forward.send(AgentCompleted);
-                        }
-                        TurnCompletionStatus::Cancelled => {
-                            // Turn was cancelled; L1 transitions back to WaitingForInput
-                            // via the existing cancel_token flow.
-                        }
-                        TurnCompletionStatus::Error { message } => {
-                            let _ = event_tx_forward.send(AgentError(message));
-                        }
-                    },
+                    } => {
+                        let _ = event_tx_forward.send(AppEvent::TurnFinished(turn_id, status));
+                    }
                     SessionEvent::BackgroundJobTerminal { summary, .. } => {
                         let _ = event_tx_forward.send(BackgroundJobTerminal(summary));
                     }
@@ -229,27 +248,12 @@ impl EventLoop {
                         } else {
                             format!("Request not started: {reason:?}.")
                         };
-                        let _ = event_tx_forward.send(AgentError(message));
+                        let _ = event_tx_forward.send(AppEvent::SubmissionRejected(message));
                     }
                     _ => {}
                 }
             }
         });
-        let event_tx_approval = RuntimeEventSender {
-            tx: event_tx.clone(),
-            generation: runtime_generation,
-        };
-        tokio::spawn(async move {
-            while let Some(request) = approval_rx.recv().await {
-                if event_tx_approval
-                    .send(ApprovalRequested(Box::new(request)))
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        });
-
         Self {
             event_tx,
             event_rx,
@@ -356,6 +360,16 @@ impl EventLoop {
             event => event,
         };
         let event = match event {
+            AppEvent::TurnFinished(id, status) => {
+                if !matches!(&self.state, AppState::AgentRunning { turn_id: Some(active), .. } if active == &id)
+                {
+                    return;
+                }
+                match status {
+                    TurnCompletionStatus::Error { message } => AgentError(message),
+                    _ => AgentCompleted,
+                }
+            }
             ApprovalRequested(request) => {
                 if matches!(self.state, AppState::AgentRunning { .. }) {
                     self.approval_queue.push_back(*request);
@@ -393,6 +407,13 @@ impl EventLoop {
             }
         };
         match (&mut self.state, event) {
+            (AppState::AgentRunning { .. }, UserInput(input)) => {
+                if input.starts_with("/fork") {
+                    eprintln!("Wait for the current turn to finish before forking.");
+                } else if !input.is_empty() {
+                    self.submit_input(input);
+                }
+            }
             (AppState::WaitingForInput, UserInput(input)) => {
                 if input.is_empty() {
                     return;
@@ -422,13 +443,7 @@ impl EventLoop {
                 eprintln!("Press Ctrl+C again within 2 seconds to exit.");
             }
 
-            (
-                AppState::AgentRunning {
-                    cancel_token,
-                    task_handle,
-                },
-                UserInterrupt,
-            ) => {
+            (AppState::AgentRunning { cancel_token, .. }, UserInterrupt) => {
                 print!("\r");
                 io::stdout().flush().ok();
                 cancel_token.cancel();
@@ -437,13 +452,22 @@ impl EventLoop {
                 tokio::spawn(async move {
                     let _ = sq_tx.send(SessionOp::Interrupt).await;
                 });
-                // Abort the dummy task handle (no-op, but keeps the enum contract).
-                task_handle.abort();
                 self.deny_pending_approvals(true);
                 self.background_tools.clear();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
                 self.first_ctrl_c_time = None;
+            }
+
+            (
+                AppState::WaitingForInput | AppState::AgentRunning { .. },
+                AppEvent::TurnStarted(id),
+            ) => {
+                println!();
+                self.state = AppState::AgentRunning {
+                    cancel_token: CancellationToken::new(),
+                    turn_id: Some(id),
+                };
             }
 
             (AppState::AgentRunning { .. }, AgentTextDelta(delta)) => {
@@ -490,6 +514,12 @@ impl EventLoop {
                 self.state = AppState::WaitingForInput;
             }
 
+            (_, AppEvent::SubmissionRejected(msg)) => {
+                eprintln!("{msg}");
+                if matches!(self.state, AppState::AgentRunning { turn_id: None, .. }) {
+                    self.state = AppState::WaitingForInput;
+                }
+            }
             (AppState::AgentRunning { .. }, AgentError(msg)) => {
                 self.deny_pending_approvals(false);
                 self.background_tools.clear();
@@ -574,23 +604,26 @@ impl EventLoop {
     }
 
     fn start_agent_turn(&mut self, input: String) {
-        self.background_tools.clear();
-        let cancel_token = CancellationToken::new();
-        // Submit through session.
-        let sq_tx = self.sq_tx.clone();
-        let task_handle = tokio::spawn(async move {
-            let _ = sq_tx
-                .send(match request_preview_payload(&input) {
-                    Some(message) => SessionOp::PreviewRequest { message },
-                    None => SessionOp::Submit { message: input },
-                })
-                .await;
-        });
+        if self.submit_input(input) {
+            self.state = AppState::AgentRunning {
+                cancel_token: CancellationToken::new(),
+                turn_id: None,
+            };
+        }
+    }
 
-        self.state = AppState::AgentRunning {
-            cancel_token,
-            task_handle,
+    fn submit_input(&self, input: String) -> bool {
+        let op = match request_preview_payload(&input) {
+            Some(message) => SessionOp::PreviewRequest { message },
+            None => SessionOp::Submit { message: input },
         };
+        match self.sq_tx.try_send(op) {
+            Ok(()) => true,
+            Err(error) => {
+                eprintln!("Input could not be submitted: {error}. Please retry.");
+                false
+            }
+        }
     }
 
     fn render(&self) {
@@ -701,14 +734,10 @@ impl EventLoop {
         // Send shutdown to the session actor.
         let _ = self.sq_tx.send(SessionOp::Shutdown).await;
 
-        if let AppState::AgentRunning {
-            cancel_token,
-            task_handle,
-        } = std::mem::replace(&mut self.state, AppState::ShuttingDown)
+        if let AppState::AgentRunning { cancel_token, .. } =
+            std::mem::replace(&mut self.state, AppState::ShuttingDown)
         {
             cancel_token.cancel();
-            task_handle.abort();
-            let _ = task_handle.await;
         }
     }
 }
@@ -733,6 +762,38 @@ fn track_background_tool(
 #[cfg(test)]
 mod background_pairing_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn background_and_queued_user_turns_follow_actor_order() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let session = manager.create_session("overlap", "").expect("session");
+        let (sq_tx, mut sq_rx) = mpsc::channel(8);
+        let (_eq_tx, eq_rx) = mpsc::unbounded_channel();
+        let (_approval_tx, approval_rx) = mpsc::unbounded_channel();
+        let mut repl = EventLoop::new(
+            session,
+            manager,
+            talos_core::session::SessionHandle { sq_tx, eq_rx },
+            approval_rx,
+        );
+        repl.handle_event(UserInput("before notification".into()));
+        repl.handle_event(AppEvent::TurnStarted("background-1".into()));
+        repl.handle_event(UserInput("during continuation".into()));
+        for expected in ["before notification", "during continuation"] {
+            assert!(
+                matches!(sq_rx.try_recv(), Ok(SessionOp::Submit { message }) if message == expected)
+            );
+        }
+        let finished =
+            || AppEvent::TurnFinished("background-1".into(), TurnCompletionStatus::Cancelled);
+        repl.handle_event(finished());
+        repl.handle_event(AppEvent::TurnStarted("queued-user".into()));
+        repl.handle_event(finished());
+        assert!(
+            matches!(repl.state, AppState::AgentRunning { turn_id: Some(ref active), .. } if active == "queued-user")
+        );
+    }
 
     #[tokio::test]
     async fn repl_prestart_budget_rejection_returns_to_input_without_a_turn_completion() {
@@ -766,7 +827,7 @@ mod background_pairing_tests {
         let AppEvent::RuntimeEvent { event: inner, .. } = &event else {
             panic!("generation fence")
         };
-        let AgentError(message) = inner.as_ref() else {
+        let AppEvent::SubmissionRejected(message) = inner.as_ref() else {
             panic!("visible rejection")
         };
         assert!(message.contains("context budget"));
@@ -1109,7 +1170,7 @@ mod approval_queue_tests {
                 event_rx,
                 state: AppState::AgentRunning {
                     cancel_token: cancel.clone(),
-                    task_handle: tokio::spawn(async {}),
+                    turn_id: Some("fixture".into()),
                 },
                 first_ctrl_c_time: None,
                 session,

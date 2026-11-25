@@ -1515,6 +1515,4 @@ messages no longer need image recovery.
 
 ### Background completion behavior
 
-Background job completion does not automatically start another model turn. Use the
-existing `process` tools to inspect or wait for jobs. Internal completion-lifecycle
-tests do not enable automatic continuation in the shipped runtime.
+A live session automatically resumes when its background job succeeds, fails or times out. The runtime reports the job ID and terminal state. Use the process tool to inspect output under the usual permissions.
