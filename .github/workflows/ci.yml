@@ -305,7 +305,7 @@ jobs:
       # I324 D2: compare supplied-byte parser against MSVC's static oracle.
       # Do not execute extracted Git images; no production loader claim.
       - name: I324 pinned PE import differential
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/i324-d2-pe-import-frontier'
+        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/i324-d2-pe-import-frontier' || github.head_ref == 'feat/i324-d2-recursive-import-graph')
         shell: pwsh
         timeout-minutes: 6
         run: |
