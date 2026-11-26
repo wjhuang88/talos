@@ -1,4 +1,48 @@
 use super::*;
+
+#[test]
+fn status_reports_staged_changes_and_unborn_index() {
+    let dir = tempfile::tempdir().expect("fixture");
+    let git = |args: &[&str]| {
+        assert!(
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .expect("git")
+                .status
+                .success()
+        );
+    };
+    git(&["init"]);
+    git(&["config", "user.name", "Test"]);
+    git(&["config", "user.email", "test@example.invalid"]);
+    std::fs::write(dir.path().join("file"), "first").expect("file");
+    git(&["add", "file"]);
+    assert!(
+        git_status_lines(dir.path())
+            .expect("status")
+            .iter()
+            .any(|s| s == "A (staged) file")
+    );
+    git(&["commit", "-m", "initial"]);
+    assert!(git_status_lines(dir.path()).expect("status").is_empty());
+    std::fs::write(dir.path().join("file"), "second").expect("file");
+    git(&["add", "file"]);
+    assert!(
+        git_status_lines(dir.path())
+            .expect("status")
+            .iter()
+            .any(|s| s == "M (staged) file")
+    );
+    git(&["rm", "-f", "file"]);
+    assert!(
+        git_status_lines(dir.path())
+            .expect("status")
+            .iter()
+            .any(|s| s == "D (staged) file")
+    );
+}
 use talos_core::tool::{ToolNature, ToolResourceKind};
 
 #[cfg(target_os = "linux")]

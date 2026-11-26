@@ -64,7 +64,53 @@ fn git_status_lines(search_path: &Path) -> Result<Vec<String>, GitToolError> {
         .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
         .map_err(|e| GitToolError::Git(e.to_string()))?;
 
+    // Index/worktree status alone misses changes after `git add`. Compare HEAD
+    // with every resolved index entry as well, including paths deleted from it.
+    let index = repo
+        .index_or_empty()
+        .map_err(|e| GitToolError::Git(e.to_string()))?;
+    let mut head_entries = std::collections::BTreeMap::new();
+    if !repo
+        .head()
+        .map_err(|e| GitToolError::Git(e.to_string()))?
+        .is_unborn()
+    {
+        for entry in repo
+            .head_tree()
+            .map_err(|e| GitToolError::Git(e.to_string()))?
+            .traverse()
+            .breadthfirst
+            .files()
+            .map_err(|e| GitToolError::Git(e.to_string()))?
+        {
+            if !entry.mode.is_tree() {
+                head_entries.insert(entry.filepath.to_vec(), (entry.oid, entry.mode.value()));
+            }
+        }
+    }
     let mut output = Vec::new();
+    for entry in index.entries() {
+        let path = entry.path(&index);
+        let previous = head_entries.remove(path);
+        if entry.stage() != gix::index::entry::Stage::Unconflicted {
+            let line = format!("! (staged) {path}");
+            if !output.contains(&line) {
+                output.push(line);
+            }
+            continue;
+        }
+        let status = match previous {
+            None => Some("A"),
+            Some((id, mode)) if id != entry.id || u32::from(mode) != entry.mode.bits() => Some("M"),
+            _ => None,
+        };
+        if let Some(status) = status {
+            output.push(format!("{status} (staged) {}", path));
+        }
+    }
+    for path in head_entries.keys() {
+        output.push(format!("D (staged) {}", gix::bstr::BStr::new(path)));
+    }
     for item in iter {
         let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
         let summary = item.summary();

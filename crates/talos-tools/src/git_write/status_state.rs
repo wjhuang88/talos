@@ -33,7 +33,9 @@ impl StatusState {
         rule: &str,
         reject_links: bool,
     ) -> Result<Self, GitToolError> {
-        let invalid = |_| GitToolError::InvalidInput("Git status evidence unavailable".into());
+        fn invalid<E>(_: E) -> GitToolError {
+            GitToolError::InvalidInput("Git status evidence unavailable".into())
+        }
         let identity = snapshot::PathIdentity::capture(root).map_err(invalid)?;
         let resolved_root = root.canonicalize().map_err(invalid)?;
         let mut pending = vec![(
@@ -44,6 +46,26 @@ impl StatusState {
         let mut directories = Vec::new();
         let mut entries = Vec::new();
         let mut ignores = Vec::new();
+        // Use only rules whose bytes are retained below. Global excludes are not
+        // needed for pruning: traversing extra paths is conservative.
+        let mut rule_sets = Vec::new();
+        let tracked_paths = if !reject_links && root.join(".git").exists() {
+            let repo = gix::discover(root).map_err(invalid)?;
+            let index = repo.index_or_empty().map_err(invalid)?;
+            index
+                .entries()
+                .iter()
+                .map(|entry| {
+                    Ok(root.join(
+                        gix::path::from_bstr(entry.path(&index))
+                            .map_err(invalid)?
+                            .as_ref(),
+                    ))
+                })
+                .collect::<Result<Vec<_>, GitToolError>>()?
+        } else {
+            Vec::new()
+        };
         let mut budget = snapshot::Budget {
             entries: 65_536,
             bytes: 4 * 1024 * 1024,
@@ -64,6 +86,16 @@ impl StatusState {
             }
             let ignore = directory.join(rule);
             let entry = capture_ignore(&ignore, &mut budget).map_err(invalid)?;
+            if !reject_links && let snapshot::Entry::File(_, bytes) = &entry {
+                let text = std::str::from_utf8(bytes).map_err(invalid)?;
+                let mut builder = ignore::gitignore::GitignoreBuilder::new(&directory);
+                for line in text.lines() {
+                    builder
+                        .add_line(Some(ignore.clone()), line)
+                        .map_err(invalid)?;
+                }
+                rule_sets.push((directory.clone(), builder.build().map_err(invalid)?));
+            }
             ignores.push((ignore, entry));
             for child in std::fs::read_dir(&directory).map_err(invalid)? {
                 let child = child.map_err(invalid)?;
@@ -92,7 +124,22 @@ impl StatusState {
                         "Push attribute traversal through worktree symlinks requires separate authorization".into(),
                     ));
                 }
-                if kind.is_dir() && !gitlinks.contains(&path) {
+                let ignored = !reject_links
+                    && kind.is_dir()
+                    && !tracked_paths
+                        .iter()
+                        .any(|tracked| tracked.starts_with(&path))
+                    && rule_sets
+                        .iter()
+                        .filter(|(base, _)| path.starts_with(base))
+                        .filter_map(|(base, rules)| {
+                            let matched = rules.matched(&path, true);
+                            (!matched.is_none())
+                                .then_some((base.components().count(), matched.is_ignore()))
+                        })
+                        .max_by_key(|(depth, _)| *depth)
+                        .is_some_and(|(_, ignored)| ignored);
+                if kind.is_dir() && !gitlinks.contains(&path) && !ignored {
                     let child_identity =
                         directory_identity(&path, &resolved.join(child.file_name()))?;
                     pending.push((path.clone(), depth + 1, child_identity));
@@ -191,6 +238,45 @@ fn capture_ignore(path: &Path, budget: &mut snapshot::Budget) -> std::io::Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ignored_build_tree_is_pruned_but_rules_and_tracked_paths_remain_bound() {
+        let root = tempfile::tempdir().expect("fixture");
+        let git = |args: &[&str]| {
+            assert!(
+                std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("git")
+                    .status
+                    .success()
+            );
+        };
+        git(&["init"]);
+        std::fs::write(root.path().join(".gitignore"), "target/\n").expect("rules");
+        let target = root.path().join("target");
+        std::fs::create_dir(&target).expect("target");
+        // An invalid ignore file would fail capture if the ignored tree were visited.
+        std::fs::create_dir(target.join(".gitignore")).expect("sentinel");
+        let before = StatusState::capture(root.path(), &[]).expect("pruned");
+        std::fs::write(target.join("artifact"), "build").expect("artifact");
+        assert_eq!(
+            before,
+            StatusState::capture(root.path(), &[]).expect("pruned")
+        );
+        git(&["add", "-f", "target/artifact"]);
+        assert!(
+            StatusState::capture(root.path(), &[]).is_err(),
+            "tracked subtree must be visited"
+        );
+        git(&["rm", "--cached", "target/artifact"]);
+        std::fs::write(root.path().join(".gitignore"), "").expect("remove rule");
+        assert!(
+            StatusState::capture(root.path(), &[]).is_err(),
+            "changed rules must be honored"
+        );
+    }
 
     #[test]
     fn pack_attributes_cover_untracked_historical_directories_without_file_bodies() {
