@@ -147,7 +147,7 @@ impl Tui {
             && hold_status.is_none()
             && self.state.thinking_preview.is_none()
             && self.stream_render.preview().is_empty()
-            && self.tool_activities.has_activity();
+            && self.tool_activities.has_pending_activity();
         // Pending tool arguments are already rendered by the request/approval surface. Keep
         // them collapsed for the whole pending lifecycle, including model assessment, so the
         // activity preview never flashes a second JSON representation before the panel opens.

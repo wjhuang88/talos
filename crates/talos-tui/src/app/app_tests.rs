@@ -5471,6 +5471,47 @@ async fn legacy_stream_eof_submits_last_token_before_any_exit_or_input_event() {
 }
 
 #[test]
+fn completed_tools_keep_animation_while_waiting_for_provider_headers() {
+    use talos_conversation::{ConversationEngine, ToolActivity, UiOutput};
+    use talos_core::{message::AgentEvent, provider::ProviderProgress};
+
+    let mut engine = ConversationEngine::new("model".into(), "provider".into());
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    for output in engine.handle_turn_started() {
+        tui.handle_ui_output(output);
+    }
+    tui.handle_ui_output(UiOutput::ToolActivity(ToolActivity::Requested {
+        call_id: "read-1".into(),
+        name: "read".into(),
+        body: "{}".into(),
+    }));
+    tui.handle_ui_output(UiOutput::ToolActivity(ToolActivity::Finished {
+        call_id: "read-1".into(),
+        is_error: false,
+        body: "done".into(),
+    }));
+    // The next HTTP response has not arrived, so there is no TurnStart yet.
+    for output in engine.handle_agent_event(&AgentEvent::ProviderProgress {
+        progress: ProviderProgress::InitialDispatch {
+            attempt: 0,
+            max_attempts: 3,
+        },
+    }) {
+        tui.handle_ui_output(output);
+    }
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.draw_frame().expect("waiting frame");
+    assert!(tui.state.status.is_processing);
+    assert!(tui.visible_processing_animation);
+    let first = tui.terminal.test_rendered_text();
+    tui.advance_processing_frame();
+    tui.draw_frame().expect("next waiting frame");
+    assert_ne!(first, tui.terminal.test_rendered_text());
+}
+
+#[test]
 fn compressed_away_processing_preview_does_not_request_animation() {
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
     tui.first_message_dispatched = true;

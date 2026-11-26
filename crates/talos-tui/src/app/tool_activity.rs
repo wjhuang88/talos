@@ -52,8 +52,8 @@ impl ToolActivities {
         self.calls.clear();
     }
 
-    pub(super) fn has_activity(&self) -> bool {
-        !self.calls.is_empty()
+    pub(super) fn has_pending_activity(&self) -> bool {
+        self.calls.iter().any(|call| call.result.is_none())
     }
 
     #[cfg(test)]
