@@ -742,13 +742,16 @@ fn pe_graph_pinned_portablegit_rebound() {
     let root = PathBuf::from(
         std::env::var_os("TALOS_I324_PE_GRAPH_ROOT").expect("explicit extracted fixture directory"),
     );
-    let read_image = |name: &str| {
+    let mut remaining = MAX_GRAPH_BYTES;
+    let mut read_image = |name: &str| {
         let file = std::fs::File::open(root.join(name)).expect("explicit fixture image");
+        let limit = MAX_IMAGE.min(remaining);
         let mut bytes = Vec::new();
-        file.take(MAX_IMAGE as u64 + 1)
+        file.take(limit as u64 + 1)
             .read_to_end(&mut bytes)
             .expect("bounded fixture read");
-        assert!(bytes.len() <= MAX_IMAGE);
+        assert!(bytes.len() <= limit);
+        remaining -= bytes.len();
         bytes
     };
     let writer = read_image("git.exe");
