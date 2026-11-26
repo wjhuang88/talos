@@ -84,6 +84,18 @@ try {
         } finally {
             [Environment]::SetEnvironmentVariable('TALOS_I324_PE_FIXTURE',$previous,'Process')
         }
+        if ($Package -eq 'PortableGit') {
+            # The graph fixture uses exactly the already compared rebound
+            # writer and five sibling package images, not host resolution.
+            $previousGraphRoot = [Environment]::GetEnvironmentVariable('TALOS_I324_PE_GRAPH_ROOT','Process')
+            try {
+                [Environment]::SetEnvironmentVariable('TALOS_I324_PE_GRAPH_ROOT',(Join-Path $install 'mingw64/libexec/git-core'),'Process')
+                & $harness --exact pe_graph_pinned_portablegit_rebound --ignored --nocapture
+                if ($LASTEXITCODE -ne 0) { throw 'Pinned supplied-image graph failed.' }
+            } finally {
+                [Environment]::SetEnvironmentVariable('TALOS_I324_PE_GRAPH_ROOT',$previousGraphRoot,'Process')
+            }
+        }
         return
     }
     $fixture = Join-Path $root 'fixture'
