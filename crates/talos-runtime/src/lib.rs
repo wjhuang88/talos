@@ -5219,19 +5219,17 @@ mod tests {
             ),
         ] {
             let root = tempfile::tempdir().expect("workspace");
+            std::fs::create_dir(root.path().join(".agent-governance")).expect("directory");
             std::fs::write(
-                root.path().join("Cargo.toml"),
-                "[package]\nname='validation-denial-fixture'\nversion='0.1.0'\nedition='2024'\n",
+                root.path().join(".agent-governance/manifest.yaml"),
+                "profile: minimal\n",
             )
             .expect("manifest");
-            std::fs::create_dir(root.path().join("src")).expect("source directory");
-            std::fs::write(root.path().join("src/lib.rs"), "pub fn fixture() {}\n")
-                .expect("source");
             let provider = Arc::new(
                 MockProvider::new()
                     .with_tool_call(
                         "validate_project",
-                        serde_json::json!({"mode":"run","profile":"workspace"}),
+                        serde_json::json!({"mode":"run","profile":"governance"}),
                     )
                     .with_response("denial observed"),
             );
@@ -5241,7 +5239,7 @@ mod tests {
                 .workspace_root(root.path())
                 .shared_tools()
                 .permission_rule(PermissionRule::new_nature(
-                    ToolNature::Execute,
+                    ToolNature::Read,
                     None,
                     None,
                     decision,

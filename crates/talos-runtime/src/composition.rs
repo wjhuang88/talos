@@ -210,7 +210,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn cargo_only_workspace_discovers_validation_across_product_profiles() {
+    async fn cargo_only_workspace_omits_validation_across_product_profiles() {
         let root = tempfile::tempdir().expect("workspace");
         std::fs::write(root.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
         for profile in [
@@ -224,17 +224,11 @@ mod tests {
                     .iter()
                     .any(|item| item.name() == "agile_summary")
             );
-            let validation = contributions
-                .iter()
-                .find(|item| item.name() == "validate_project")
-                .expect("validation");
-            assert!(validation.tool().cleanup_receipt().is_some());
-            let result = validation
-                .tool()
-                .execute(serde_json::json!({"mode":"plan","profile":"workspace"}))
-                .await;
-            assert!(!result.is_error, "{}", result.content);
-            assert!(result.content.contains("cargo check --locked --workspace"));
+            assert!(
+                !contributions
+                    .iter()
+                    .any(|item| item.name() == "validate_project")
+            );
         }
         let empty = tempfile::tempdir().expect("empty");
         assert!(
