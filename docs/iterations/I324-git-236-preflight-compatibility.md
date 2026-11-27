@@ -231,3 +231,17 @@ enforced deployment boundary. Recommendation: preserve strict D1 and keep
 affected replacements Unsupported until a concrete trusted mechanism is
 proven or a separate exact-text decision is accepted. No production
 implementation, permission change or issue completion is claimed.
+
+
+## 2026-11-27 option B redesign (not accepted)
+
+Maintainer chose B for redesign/review only, recorded in
+[#919 decision receipt](https://github.com/wjhuang88/talos/issues/919#issuecomment-7213718098).
+#1037 merged as `3fa91ea4ba7cefae7cb4a3164b543c0047346d37` and remains
+non-operative feasibility evidence under strict D1. See
+[option B source-specific contract](../proposals/i324-b-source-specific-trust-contract.md)
+for the conditional host-execution premise, explicit differential
+counterexample, query-by-query proof obligations and staged source matrix.
+Independent security/API disposition and separate exact-text maintainer
+acceptance are required before any changed trust contract can operate.
+No production change; strict D1 remains effective, #919 stays Open.
