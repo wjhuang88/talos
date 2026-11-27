@@ -282,6 +282,12 @@ impl AppServerSession {
         session: talos_session::Session,
         metadata: talos_session::SessionMetadata,
     ) {
+        *self
+            .agent
+            .checkpoint_session
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            (session.file_extension() == "tlog").then(|| session.clone());
         self.pending_store = PendingSubmissionStore::for_session(&session);
         self.recovered_source = None;
         if self.session_id != session.id.to_string() {

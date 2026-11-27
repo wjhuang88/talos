@@ -370,7 +370,7 @@ async fn read_session_snapshot_cancellable(
         }
     }
     let finish = tokio::task::spawn_blocking(move || -> Result<_> {
-        let archived = scan.has_archive_placeholder();
+        let archived = scan.has_archive_placeholder() && !scan.has_checkpoint_head();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         let head =
             scan.finish_with_tail_cancellable(deadline, || worker_cancellation.is_cancelled())?;

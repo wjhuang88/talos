@@ -57,6 +57,48 @@ impl Agent {
                 "checkpoint deadline exceeded".into(),
             ));
         }
+        if let Some(session) = self
+            .checkpoint_session
+            .read()
+            .map_err(|_| {
+                CompactionError::CompactionFailed("checkpoint session unavailable".into())
+            })?
+            .as_ref()
+        {
+            let prior = cached
+                .as_ref()
+                .filter(|p| Some(p.sequence) == projection.parent_sequence)
+                .map(|p| (p.content.as_str(), p.covered.len()));
+            session
+                .archive_checkpoint(
+                    &projection.content,
+                    prior,
+                    projection.covered.len(),
+                    |position, id, message| {
+                        projection
+                            .covered
+                            .get(position)
+                            .and_then(|index| {
+                                projection.source.resolve(
+                                    projection.source.generation(),
+                                    projection.source.revision(),
+                                    *index,
+                                    message,
+                                )
+                            })
+                            .is_some_and(|reference| {
+                                !reference.starts_with("tlog:")
+                                    || reference == format!("tlog:{}:{id}", session.id)
+                            })
+                    },
+                )
+                .map_err(|error| {
+                    tracing::warn!(%error, "checkpoint archive publication failed");
+                    CompactionError::CompactionFailed(
+                        "checkpoint archive publication failed".into(),
+                    )
+                })?;
+        }
         *cached = Some(projection);
         Ok(())
     }
@@ -69,34 +111,28 @@ impl Agent {
         *slot = None;
     }
 
-    /// Reuse only exact covered raw entries in the same runtime generation.
-    /// Synthetic context and the current tail always come from the new request.
-    pub(crate) async fn reuse_checkpoint_projection(
+    /// Materialize the effective request and report whether a replacement can cover new history.
+    pub(super) async fn verified_checkpoint_view(
         &self,
-        plan: &mut ProviderRequestPlan,
+        plan: &ProviderRequestPlan,
         source: &HistorySource,
         context_limit: u32,
         private: &PrivateTokens,
-    ) -> bool {
+    ) -> Option<(ProviderRequestPlan, bool)> {
         let projection = self
             .checkpoint_projection_state
             .lock()
             .ok()
-            .and_then(|cached| cached.clone());
-        let Some(projection) = projection else {
-            return false;
-        };
-        let deadline = source
-            .deadline()
-            .unwrap_or_else(|| tokio::time::Instant::now() + std::time::Duration::from_secs(120));
+            .and_then(|cached| cached.clone())?;
+        let deadline = source.deadline().unwrap_or_else(|| {
+            tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT
+        });
         for &index in &projection.covered {
             tokio::task::yield_now().await;
             if tokio::time::Instant::now() >= deadline {
-                return false;
+                return None;
             }
-            let Some(message) = plan.messages.get(index) else {
-                return false;
-            };
+            let message = plan.messages.get(index)?;
             let old = projection.source.resolve(
                 projection.source.generation(),
                 projection.source.revision(),
@@ -109,7 +145,7 @@ impl Agent {
                 if let Ok(mut cached) = self.checkpoint_projection_state.lock() {
                     *cached = None;
                 }
-                return false;
+                return None;
             }
         }
         let valid = projection.sequence != 0
@@ -126,13 +162,13 @@ impl Agent {
             if let Ok(mut cached) = self.checkpoint_projection_state.lock() {
                 *cached = None;
             }
-            return false;
+            return None;
         }
         let mut candidate = Vec::with_capacity(plan.messages.len() - projection.covered.len() + 1);
         for (index, message) in plan.messages.iter().enumerate() {
             tokio::task::yield_now().await;
             if tokio::time::Instant::now() >= deadline {
-                return false;
+                return None;
             }
             if index == projection.covered[0] {
                 candidate.push(Message::Context {
@@ -146,19 +182,28 @@ impl Agent {
         let estimated = self
             .estimate_provider_request_tokens(&candidate, &plan.tool_definitions)
             .saturating_add(plan.ephemeral_image_tokens);
-        if tokio::time::Instant::now() >= deadline
-            || matches!(
-                crate::compaction::RequestPressure::assess(estimated, context_limit),
-                crate::compaction::RequestPressure::Critical
-                    | crate::compaction::RequestPressure::Emergency
-            )
-        {
-            // A new checkpoint may replace this one only after full validation.
-            // Keep the cached projection and the caller's original plan intact.
-            return false;
+        if tokio::time::Instant::now() >= deadline {
+            return None;
         }
-        plan.messages = candidate;
-        plan.estimated_tokens = estimated;
-        true
+        let end = crate::checkpoint_request::eligible_prefix_end(&plan.messages)?;
+        let new_prefix = (projection.covered.last()? + 1..end).any(|index| {
+            let message = &plan.messages[index];
+            !matches!(message, Message::System { .. })
+                && (!matches!(message, Message::Context { .. })
+                    || source
+                        .resolve(source.generation(), source.revision(), index, message)
+                        .is_some())
+        });
+        Some((
+            ProviderRequestPlan {
+                messages: candidate,
+                estimated_tokens: estimated,
+                tool_definitions: plan.tool_definitions.clone(),
+                tool_protocol: plan.tool_protocol,
+                ephemeral_image_tokens: plan.ephemeral_image_tokens,
+                omitted_tool_exchanges: plan.omitted_tool_exchanges,
+            },
+            new_prefix,
+        ))
     }
 }

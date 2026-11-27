@@ -178,7 +178,7 @@ impl Agent {
             0,
             history.len() as u64,
             &history,
-            tokio::time::Instant::now() + std::time::Duration::from_secs(120),
+            tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT,
         )
         .await;
         self.prepare_turn_start_with_source(
@@ -240,7 +240,7 @@ impl Agent {
             revision,
             &history,
             recovered,
-            tokio::time::Instant::now() + std::time::Duration::from_secs(120),
+            tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT,
         )
         .await;
         self.prepare_turn_start_with_source(
@@ -488,13 +488,21 @@ impl Agent {
     ) -> AgentResult<ProviderRequestPlan> {
         if let Some(limit) = request_context_limit {
             use crate::compaction::RequestPressure;
-            let reused = if let Some(source) = history_source {
-                self.reuse_checkpoint_projection(&mut plan, source, limit, private_tokens)
+            let prior = if let Some(source) = history_source {
+                self.verified_checkpoint_view(&plan, source, limit, private_tokens)
                     .await
             } else {
-                false
+                None
             };
-            let source_verified = !reused
+            let before = prior
+                .as_ref()
+                .map_or(plan.estimated_tokens, |(view, _)| view.estimated_tokens);
+            let needs_checkpoint = prior.as_ref().is_none_or(|(_, additional)| *additional)
+                && matches!(
+                    RequestPressure::assess(before, limit),
+                    RequestPressure::Critical | RequestPressure::Emergency
+                );
+            let source_verified = needs_checkpoint
                 && history_source.is_some_and(|source| {
                     crate::checkpoint_request::eligible_prefix_end(&plan.messages).is_some_and(
                         |end| {
@@ -517,12 +525,12 @@ impl Agent {
                         },
                     )
                 });
-            if source_verified
-                && matches!(
-                    RequestPressure::assess(plan.estimated_tokens, limit),
-                    RequestPressure::Critical | RequestPressure::Emergency
-                )
-            {
+            // Keep the verified baseline for dispatch if replacement preparation fails.
+            let mut raw = None;
+            if let Some((view, _)) = prior {
+                raw = Some(std::mem::replace(&mut plan, view));
+            }
+            if source_verified {
                 // Failure leaves the sealed projection intact. Existing bounded
                 // recovery must still admit it or return an explicit refusal.
                 let progress = crate::checkpoint_progress::CheckpointProgress::start(
@@ -532,9 +540,9 @@ impl Agent {
                 let deadline = history_source
                     .and_then(crate::compaction::HistorySource::deadline)
                     .unwrap_or_else(|| {
-                        tokio::time::Instant::now() + std::time::Duration::from_secs(120)
+                        tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT
                     });
-                let mut candidate = plan.clone();
+                let mut candidate = raw.unwrap_or_else(|| plan.clone());
                 let mut projection = None;
                 let prepared = self
                     .checkpoint_request_once_deferred(
@@ -546,6 +554,7 @@ impl Agent {
                     )
                     .await;
                 if prepared.is_ok()
+                    && candidate.estimated_tokens < before
                     && let Some(projection) = projection
                 {
                     let install = || self.install_checkpoint_projection(projection, deadline);
@@ -581,14 +590,7 @@ impl Agent {
                         .unwrap_or(talos_core::session::AutomaticCompactFailure::Preparation);
                     progress.finish(Err(reason));
                 }
-            } else if !reused
-                && !source_verified
-                && matches!(
-                    RequestPressure::assess(plan.estimated_tokens, limit),
-                    RequestPressure::Critical | RequestPressure::Emergency
-                )
-                && let Some(observer) = checkpoint_observer
-            {
+            } else if needs_checkpoint && let Some(observer) = checkpoint_observer {
                 observer.emit(
                     talos_core::session::AutomaticCompactState::SkippedSourceUnavailable {
                         before: plan.estimated_tokens,

@@ -82,7 +82,9 @@ pub fn format_compact_status(id: u64, state: talos_core::session::CompactState) 
                     format!("applied: estimated tokens {before} → {after}")
                 }
                 CompactOutcome::NotEligible { before } => {
-                    format!("skipped: estimated tokens {before}, below threshold")
+                    format!(
+                        "skipped: effective request estimate {before}, no additional compaction needed"
+                    )
                 }
                 CompactOutcome::Failed => {
                     "failed during preparation: estimate unavailable; prior context retained".into()

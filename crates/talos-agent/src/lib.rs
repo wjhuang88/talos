@@ -398,6 +398,7 @@ pub struct Agent {
     image_input_supported: bool,
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
+    checkpoint_session: std::sync::RwLock<Option<talos_session::Session>>,
     checkpoint_sequence: std::sync::atomic::AtomicU64,
     checkpoint_attempts: std::sync::Mutex<checkpoint_attempts::CheckpointAttempts>,
     checkpoint_projection_state:
@@ -1809,7 +1810,8 @@ impl Agent {
                 checkpoint_tools::EXECUTION.try_with(Clone::clone),
                 history_source.as_mut(),
             ) {
-                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                let deadline =
+                    tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT;
                 let valid = tokio::time::timeout(
                     std::time::Duration::from_secs(2),
                     source.bind_continuation_until(&messages, persist_start, deadline),
@@ -2125,7 +2127,7 @@ impl Agent {
                     && let Ok(Some(mut job)) = compact_job.await
                 {
                     let deadline =
-                        tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                        tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT;
                     let mut measured_before = None;
                     let preparation = async {
                         let Some(limit) = request_context_limit else {

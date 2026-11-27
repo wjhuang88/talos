@@ -5758,7 +5758,7 @@ async fn exercise_manual_boundary_hook_timeout(hang: bool, cancel: bool, deny: b
             &[talos_plugin::HookEventKind::BeforeProviderCall]
         }
         fn timeout(&self) -> Duration {
-            Duration::from_secs(360)
+            crate::checkpoint_request::CHECKPOINT_TIMEOUT * 3
         }
         async fn on_event(
             &self,
@@ -5876,7 +5876,10 @@ async fn exercise_manual_boundary_hook_timeout(hang: bool, cancel: bool, deny: b
                 .await
                 .expect("targeted cancellation");
         } else {
-            tokio::time::advance(Duration::from_secs(121)).await;
+            tokio::time::advance(
+                crate::checkpoint_request::CHECKPOINT_TIMEOUT + Duration::from_secs(1),
+            )
+            .await;
         }
     }
     let mut compact_finished = false;

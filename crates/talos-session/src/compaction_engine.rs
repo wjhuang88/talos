@@ -83,10 +83,30 @@ impl CompactionEngine {
         session_dir: &Path,
         max_entries: usize,
     ) -> Result<CompactionResult, SessionError> {
+        self.compact_bound(head_path, session_dir, max_entries, None)
+    }
+
+    pub(crate) fn compact_bound(
+        &self,
+        head_path: &Path,
+        session_dir: &Path,
+        max_entries: usize,
+        checkpoint: Option<(&[SessionEntry], &str, &str)>,
+    ) -> Result<CompactionResult, SessionError> {
         // Keep retirement excluded between store calls and archive publication.
         // Nested store acquisitions are nonblocking; no waiter is installed.
         let _identity = crate::identity_custody::require_not_retired(head_path)?;
         let entries = self.store.read_entries(head_path)?;
+        if let Some((expected, _, _)) = checkpoint
+            && (entries.len() != expected.len()
+                || entries.iter().zip(expected).any(|(a, b)| {
+                    crate::compact_text::encode_entry(a) != crate::compact_text::encode_entry(b)
+                }))
+        {
+            return Err(SessionError::DurableTurn(
+                "checkpoint source changed".into(),
+            ));
+        }
         if entries.len() <= max_entries {
             return Ok(CompactionResult::Skipped);
         }
@@ -122,7 +142,17 @@ impl CompactionEngine {
 
         let original_bytes = std::fs::metadata(head_path).map(|m| m.len()).unwrap_or(0);
 
-        let compacted = self.apply_rules(&entries, max_entries);
+        let mut compacted = self.apply_rules(&entries, max_entries);
+        if let Some((_, summary, through)) = checkpoint {
+            let name = if self.compressor.format_tag() == "none" {
+                format!("{segment_id}.tlog")
+            } else {
+                format!("{segment_id}.tlog.zst")
+            };
+            compacted[0].content.push_str(&format!(
+                "\nArchive: {name}\nCovered through: {through}\n{summary}"
+            ));
+        }
         let zero_tail = if max_entries == 0
             && matches!(
                 self.store.history_encoding(),

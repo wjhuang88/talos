@@ -17,10 +17,25 @@ use uuid::Uuid;
 #[derive(Clone, Default)]
 pub(crate) struct HistoryMessageDecoder {
     pending_tool_call_ids: HashSet<String>,
+    covered_through: Option<String>,
+    matched_boundary: Option<String>,
+    duplicate_boundary: bool,
 }
 
 impl HistoryMessageDecoder {
+    pub(crate) fn complete(&self) -> bool {
+        self.covered_through.is_none() && !self.duplicate_boundary
+    }
     pub(crate) fn decode(&mut self, entry: SessionEntry) -> Option<(String, Message)> {
+        self.duplicate_boundary |= self.matched_boundary.as_deref() == Some(&entry.id);
+        if self.covered_through.is_some() {
+            if self.covered_through.as_deref() == Some(&entry.id) {
+                self.matched_boundary = self.covered_through.take();
+            }
+            if entry.role != "system" || !entry.content.starts_with("__SYSTEM__:") {
+                return None;
+            }
+        }
         let msg = match entry.role.as_str() {
             "user" => {
                 self.pending_tool_call_ids.clear();
@@ -42,7 +57,17 @@ impl HistoryMessageDecoder {
                 .into()
             }
             "system" => {
-                if is_terminal_diagnostic_content(&entry.content)
+                if let Some(summary) = crate::archive_recovery::checkpoint_summary(&entry) {
+                    self.covered_through = entry
+                        .content
+                        .split_once("\nCovered through: ")
+                        .and_then(|(_, rest)| rest.lines().next())
+                        .filter(|id| *id != "-")
+                        .map(str::to_owned);
+                    Some(Message::Context {
+                        content: summary.to_owned(),
+                    })
+                } else if is_terminal_diagnostic_content(&entry.content)
                     || is_turn_transcript_outcome_content(&entry.content)
                 {
                     None
@@ -246,11 +271,17 @@ impl Session {
     /// IDs identify entries within this session, not a branch authorization.
     pub fn read_messages_with_entry_ids(&self) -> Result<Vec<(String, Message)>, SessionError> {
         let mut decoder = HistoryMessageDecoder::default();
-        Ok(self
+        let messages = self
             .read_entries()?
             .into_iter()
             .filter_map(|entry| decoder.decode(entry))
-            .collect())
+            .collect();
+        if !decoder.complete() {
+            return Err(SessionError::DurableTurn(
+                "invalid checkpoint coverage boundary".into(),
+            ));
+        }
+        Ok(messages)
     }
 
     pub fn read_events(&self) -> Result<Vec<AgentEvent>, SessionError> {

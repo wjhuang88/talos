@@ -813,7 +813,12 @@ fn reconstruct(
     let mut placeholders = BTreeSet::new();
     for &index in &selected {
         if files[index].records.first().is_some_and(|(entry, _)| {
-            placeholder(entry) && entry.content.ends_with(", 0 recent entries preserved]")
+            placeholder(entry)
+                && entry
+                    .content
+                    .lines()
+                    .next()
+                    .is_some_and(|line| line.ends_with(", 0 recent entries preserved]"))
         }) && !bridges.contains_key(&index)
         {
             return Err(invalid("zero-retention compaction receipt missing"));
@@ -926,12 +931,37 @@ fn insert_records(
     Ok(())
 }
 
+/// Semantic marker written by the segment publisher. Never interpret ordinary
+/// user/assistant text or legacy count-only markers as model context.
+pub(crate) fn checkpoint_summary(entry: &SessionEntry) -> Option<&str> {
+    if entry.role != "system" || entry.parent_id.is_some() || !entry.metadata.is_empty() {
+        return None;
+    }
+    let (header, remaining) = entry.content.split_once("\nArchive: ")?;
+    let (name, remaining) = remaining.split_once("\nCovered through: ")?;
+    let (end, summary) = remaining.split_once('\n')?;
+    if end != "-" && uuid::Uuid::parse_str(end).is_err() {
+        return None;
+    }
+    if !is_count_marker(header)
+        || !crate::archive_publication::owned(name)
+        || !summary.starts_with("[Derived checkpoint; source history remains authoritative]\n")
+        || summary.len() > 64 * 1024
+    {
+        return None;
+    }
+    Some(summary)
+}
+
 pub(crate) fn placeholder(entry: &SessionEntry) -> bool {
     if entry.role != "system" || entry.parent_id.is_some() || !entry.metadata.is_empty() {
         return false;
     }
-    let Some(body) = entry
-        .content
+    is_count_marker(&entry.content) || checkpoint_summary(entry).is_some()
+}
+
+fn is_count_marker(content: &str) -> bool {
+    let Some(body) = content
         .strip_prefix("[Compaction summary: ")
         .and_then(|s| s.strip_suffix(" recent entries preserved]"))
     else {
