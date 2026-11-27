@@ -1,6 +1,6 @@
 # Iteration I337: Offline Search MCP Observation and Replay
 
-> Document status: Active / Claimed — effective #1016
+> Document status: Complete / Closed
 > Published plan date: 2026-11-24
 > Planned objective: implement bounded offline-only evidence infrastructure for #1015.
 > MVP deliverable: deterministic local synthetic Exa/Parallel search protocol tests and sanitized replay metadata.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6.2 |
 | Work Slice | D2-T3 / #1015: offline synthetic MCP search observation and replay only; no external query, runtime backend, provider admission or permission changes |
@@ -19,9 +19,9 @@
 | Governance Claim PR | #1016 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorizes Talos-side engineering, 2026-11-23; proposed #1016 requires independent technical review, exact-head applicable CI and both governance validators, merge CAS. Single maintainer; no supplier rights granted. |
-| Implementation PR | [#1018](https://github.com/wjhuang88/talos/pull/1018) — draft; local convergence in progress |
+| Implementation PR | [#1018](https://github.com/wjhuang88/talos/pull/1018) — merged |
 | Last Updated | 2026-11-24 |
-| Handoff / Release Condition | Local convergence, independent review and exact-head native CI before source closeout; #848 remains open |
+| Handoff / Release Condition | Closed on owner-first publication; #848 and #624 remain open |
 
 ## Published baseline
 
@@ -52,7 +52,7 @@ The atomic claim and activation in #1016 merged to main as `9eee120a23cc446413a3
 
 ## Verification and residuals
 
-Pending. Exact-head evidence required. #848 external admission remains blocked regardless of this offline outcome.
+Completed offline fixture acceptance; see final evidence below. #848 external admission remains blocked.
 
 ## Execution checkpoint — 2026-11-24 (Partial)
 
@@ -66,4 +66,15 @@ The saved implementation commits were preserved in draft PR #1018. Focused test-
 
 The strict tool/schema and result-URL gates exist only in the fixture caller. Existing generic transport/facade behavior is not hardened and is not claimed safe for search: response buffering/error-body disclosure and absence of production tool allowlisting/body/request budgets remain residuals. Python proxy/TLS labels are injected; Rust's TLS-style failure is confined to a local sink. No external provider traffic or links were used.
 
-`cargo fmt --all -- --check`, package Clippy, and all 19 `talos-mcp` library tests passed. Full package integration tests did not pass: `git_prepared` cases encountered the sandbox's inherited Git overrides, and a diagnostic run with those unset encountered Git maintenance executable-binding errors. Standard `release_preflight.sh` reached workspace tests and reported 763 passed / 6 unrelated `talos-agent` Git/auto-review failures; it is not a pass. Collaboration validation has two warnings on unrelated SEARCH-001-D3 owners. Keep the iteration Active; independent review, exact-head native CI and merge-time CAS remain pending. Do not claim vendor compatibility, admission, or issue closure.
+`cargo fmt --all -- --check`, package Clippy, and all 19 `talos-mcp` library tests passed. Full package integration tests did not pass: `git_prepared` cases encountered the sandbox's inherited Git overrides, and a diagnostic run with those unset encountered Git maintenance executable-binding errors. Standard `release_preflight.sh` reached workspace tests and reported 763 passed / 6 unrelated `talos-agent` Git/auto-review failures; it is not a pass. Collaboration validation has two warnings on unrelated SEARCH-001-D3 owners. At that checkpoint the iteration remained Active; final review, exact-head native CI and merge are recorded below. No vendor compatibility or admission is claimed.
+
+## Completion — 2026-11-24
+
+The bounded offline-only I337 implementation [#1018](https://github.com/wjhuang88/talos/pull/1018) merged into main at `9eddf0c5703d77f89bd754c5bf22c5b26bc84a6f`. The actual client transport, dispatcher and facade are exercised only against fixed local IPv4 loopback fixtures. Both providers' valid descriptors independently reject forbidden requested tools, and cancellation uses receipt/response synchronization instead of a scheduling-dependent sleep. No production behavior, permissions, dependency, public schema, default routing, provider admission or vendor traffic changed.
+
+- Final candidate `0e5d79b7836bec5ca480e3d4fbbf759c833d6667`: [CI #45376102360](https://github.com/wjhuang88/talos/actions/runs/45376102360) **8/8 SUCCESS**, including macOS preflight, Linux Desktop, both Windows workspace checks, remote issue reconciliation and installer. Native preflight reports all six offline Rust tests and release preflight passed. Local checkpoint reported 19/19 library tests, ten repeated cancellation runs, Python 4 methods / 50 scenarios, fmt, Clippy and both governance validators passed. Preserve the earlier local full-package/workspace failures rather than representing them as local passes.
+- Independent [final review](https://github.com/wjhuang88/talos/pull/1018#pullrequestreview-6042449387) on that candidate: Approval recommended / No open issues; both blocking threads resolved. GitHub review state COMMENTED, not formal APPROVED; [maintainer-directed merge evidence](https://github.com/wjhuang88/talos/pull/1018#issuecomment-7136634029) records the review disposition and merge-time CAS. No additional coding agent was delegated.
+- Residuals: synthetic wire only; test-side guards do not harden the generic runtime MCP client. #848/#624 stay open; supplier access/output rights, real vendor wire and regional evidence, production search guards/admission and default enablement remain outside this delivered slice.
+- GitHub automatically closed #1015 at implementation merge; it was temporarily reopened and the coding agent assignment removed to restore owner-first order. Completion of this owner and derived inventories takes effect on closeout merge, then #1015 closes.
+
+Completion Commit: 9eddf0c5703d77f89bd754c5bf22c5b26bc84a6f
