@@ -69,7 +69,7 @@ impl Agent {
                 .as_ref()
                 .filter(|p| Some(p.sequence) == projection.parent_sequence)
                 .map(|p| (p.content.as_str(), p.covered.len()));
-            session
+            let persisted = session
                 .archive_checkpoint(
                     &projection.content,
                     prior,
@@ -98,6 +98,11 @@ impl Agent {
                         "checkpoint archive publication failed".into(),
                     )
                 })?;
+            if persisted.is_some_and(|content| content != projection.content) {
+                return Err(CompactionError::CompactionFailed(
+                    "existing checkpoint already covers these sources".into(),
+                ));
+            }
         }
         *cached = Some(projection);
         Ok(())

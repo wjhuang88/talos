@@ -2091,6 +2091,10 @@ fn live_checkpoint_rebinds_rotated_head_after_projection_cache_loss() {
     session
         .archive_checkpoint(&format!("{header}first"), None, 6, verify)
         .expect("first");
+    let existing = session
+        .archive_checkpoint(&format!("{header}alternative"), None, 6, verify)
+        .expect("same coverage");
+    assert_eq!(existing.as_deref(), Some(format!("{header}first").as_str()));
     session
         .archive_checkpoint(&format!("{header}second"), None, 9, verify)
         .expect("second");

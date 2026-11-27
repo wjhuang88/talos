@@ -199,7 +199,7 @@ impl Session {
         previous: Option<(&str, usize)>,
         covered: usize,
         mut matches: impl FnMut(usize, &str, &talos_core::message::Message) -> bool,
-    ) -> Result<(), SessionError> {
+    ) -> Result<Option<String>, SessionError> {
         let invalid =
             || SessionError::DurableTurn("checkpoint does not match active segment".into());
         if covered == 0
@@ -216,7 +216,7 @@ impl Session {
             crate::archive_recovery::placeholder(entry)
                 && crate::archive_recovery::checkpoint_summary(entry).is_none()
         }) {
-            return Ok(());
+            return Ok(None);
         }
         let mut decoder = crate::jsonl::HistoryMessageDecoder::default();
         let mut cursor = 0;
@@ -272,7 +272,22 @@ impl Session {
                     }
                 }
                 if cursor == covered {
-                    return Ok(());
+                    let _guard = self
+                        .write_lock
+                        .lock()
+                        .map_err(|_| SessionError::LockPoisoned)?;
+                    let current = self.store.read_entries(&self.file_path)?;
+                    if current.len() != entries.len()
+                        || current.iter().zip(&entries).any(|(a, b)| {
+                            crate::compact_text::encode_entry(a)
+                                != crate::compact_text::encode_entry(b)
+                        })
+                    {
+                        return Err(invalid());
+                    }
+                    return Ok(
+                        crate::archive_recovery::checkpoint_summary(entry).map(str::to_owned)
+                    );
                 }
                 continue;
             }
@@ -320,7 +335,7 @@ impl Session {
         if matches!(result, crate::compaction_engine::CompactionResult::Skipped) {
             return Err(invalid());
         }
-        Ok(())
+        Ok(None)
     }
 
     /// Create a new session with a single empty root branch.
