@@ -1,3 +1,7 @@
+## MCP-002 / #1033 — stdio MCP process supervision intake
+
+[Owner](backlog/active/MCP-002-stdio-process-supervision.md) / [#1033](https://github.com/wjhuang88/talos/issues/1033): Intake / Unclaimed; native macOS acceptance pending. No claim or implementation; MCP-001 remains Complete.
+
 ## GIT-002 — Fetch / Rebase / Pull strategy planning
 
 Refinement / Unclaimed; implementation not started. [Owner and acceptance](backlog/active/GIT-002-fetch-rebase-pull-strategy.md). Prior Git/TUI repairs are on main through `c7153ab`, with successful preflight and actual push. [Saved progress, limitations and resume steps](tasks/2026-11-27-git-tools-handoff.md).
