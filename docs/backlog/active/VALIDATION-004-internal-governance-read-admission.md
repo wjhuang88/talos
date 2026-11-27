@@ -9,7 +9,7 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | Codex |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Internal governance validation permission classification |
 | Claimed At | 2026-11-28 |
