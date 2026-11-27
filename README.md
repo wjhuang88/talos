@@ -726,12 +726,7 @@ output is available. Evidence summaries are bounded separately.
 The model tools `agile_summary` and `validate_project` were delivered in I315. Use the summary for explicit progress/backlog requests or task-relevant
 governance questions, not ordinary chat or repeated unchanged status refreshes.
 A governance manifest or any two canonical Board/iteration-index/backlog files
-enable summary discovery, including small or Planned projects. Validation uses
-recognized project markers independently: a Cargo-only project qualifies without
-governance files. `validate_project` accepts only `mode: plan|run` and
-`profile: governance|i076|workspace`; plan starts no commands, while governance runs use Read admission and Cargo checks in i076 and workspace require command-specific
-Execute admission. Neither tool edits task records, activates iterations or changes
-Issues. Missing prerequisites are reported, not created to enable discovery.
+enable summary discovery, including small or Planned projects. The built-in `validate_project` tool uses the same governance markers. It accepts `mode: plan|run` and an optional `profile: governance`. Both modes process governance metadata within the runtime. Missing prerequisites are reported, not created to enable discovery.
 
 ### Permission Preflight
 

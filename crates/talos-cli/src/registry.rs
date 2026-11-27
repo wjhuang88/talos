@@ -1136,71 +1136,8 @@ pub(crate) fn highlight_snippet(snippet: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    struct ValidationExecutionMarker(PathBuf);
-
-    impl talos_tools::project_management::ValidationHostFactory for ValidationExecutionMarker {
-        fn invocation(&self) -> Box<dyn talos_conversation::ValidationHostExecutor> {
-            std::fs::write(&self.0, "unexpected execution").expect("execution marker");
-            panic!("permission denial must not construct an executor")
-        }
-    }
-
-    #[async_trait]
-    impl talos_core::tool::ToolCleanupReceipt for ValidationExecutionMarker {
-        async fn wait(
-            &self,
-            _: std::time::Duration,
-        ) -> Result<(), talos_core::tool::ToolCleanupError> {
-            Ok(())
-        }
-    }
-
-    impl talos_core::tool::ToolCleanupOwner for ValidationExecutionMarker {
-        fn seal(&self) {}
-    }
-
-    #[tokio::test]
-    async fn validation_run_real_permission_denial_never_reaches_host_factory() {
-        let workspace = tempfile::tempdir().expect("workspace");
-        std::fs::write(workspace.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
-        let marker = workspace.path().join("execution-marker");
-        let contributions = talos_tools::project_management::validation_tool_contributions(
-            workspace.path().to_owned(),
-            Arc::new(ValidationExecutionMarker(marker.clone())),
-        );
-        for decision in [
-            serde_json::json!({"Deny":"validation blocked"}),
-            serde_json::json!("Ask"),
-        ] {
-            let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
-            engine
-                .load_from_config(
-                    &serde_json::json!({"rules":[{"decision":decision,"nature":"Execute"}]}),
-                )
-                .expect("policy");
-            let wrapped = PermissionAwareTool {
-                inner: contributions[0].tool().clone(),
-                approval: Arc::new(Mutex::new(ApprovalPrompt::new(engine))),
-                print_mode: true,
-            };
-            let run = wrapped
-                .execute(serde_json::json!({"mode":"run","profile":"workspace"}))
-                .await;
-            assert!(run.is_error, "run must be refused: {}", run.content);
-            assert!(!marker.exists());
-            let plan = wrapped
-                .execute(serde_json::json!({"mode":"plan","profile":"workspace"}))
-                .await;
-            assert!(!plan.is_error, "read-only plan: {}", plan.content);
-            assert!(!marker.exists());
-        }
-    }
-
-    #[tokio::test]
-    async fn validation_requests_use_production_permission_pipeline() {
-        use talos_agent::permission_pipeline::{
-            PermissionAuthorizationRequest, PermissionPipeline,
-        };
+    #[test]
+    fn cargo_marker_alone_does_not_register_governance_validation() {
         let workspace = tempfile::tempdir().expect("workspace");
         std::fs::write(workspace.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
         let registry = build_print_registry_bound_to_workspace(
@@ -1208,36 +1145,11 @@ mod tests {
             Vec::new(),
             workspace.path().to_owned(),
         );
-        let tool = registry
-            .get("validate_project")
-            .expect("registered validation");
-        let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
-        engine.load_from_config(&serde_json::json!({"rules":[{"decision":{"Deny":"validation denied"},"nature":"Execute"}]})).expect("policy");
-        let pipeline = PermissionPipeline::new(
-            Arc::new(PermissionSessionState::new(engine)),
-            PermissionContext::new(PermissionMode::Headless, InteractionCapability::Unavailable),
-            None,
-        );
-        for (mode, allowed) in [("plan", true), ("run", false)] {
-            let input = serde_json::json!({"mode":mode,"profile":"workspace"});
-            let profile = tool.permission_profile(&input);
-            let result = pipeline
-                .authorize(PermissionAuthorizationRequest {
-                    tool_name: tool.name(),
-                    provenance: tool.provenance(),
-                    profile: &profile,
-                    input: &input,
-                    presentation_input: tool.project_input(&input),
-                    summary_fields: Vec::new(),
-                    deadline: std::time::Duration::from_secs(1),
-                })
-                .await;
-            assert_eq!(result.is_ok(), allowed, "{mode}");
-        }
+        assert!(registry.get("validate_project").is_none());
     }
 
     #[tokio::test]
-    async fn cli_registered_validation_uses_agent_prepared_admission() {
+    async fn cli_registered_validation_runs_governance_without_execute_permission() {
         let workspace = tempfile::tempdir().expect("workspace");
         std::fs::create_dir(workspace.path().join(".agent-governance")).expect("directory");
         std::fs::write(
@@ -1261,7 +1173,7 @@ mod tests {
         let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
         engine
             .load_from_config(
-                &serde_json::json!({"rules":[{"decision":"Allow","nature":"Execute"}]}),
+                &serde_json::json!({"rules":[{"decision":{"Deny":"no host execution"},"nature":"Execute"}]}),
             )
             .expect("policy");
         let agent = talos_agent::Agent::with_security_and_hooks(
@@ -1298,88 +1210,9 @@ mod tests {
         assert_eq!(evidence["records"][0]["execution_mode"], "internal");
         assert_eq!(
             evidence["records"][0]["permission_decision"],
-            "exact prepared invocation admitted and consumed"
+            "internal read-only governance check; no host execution requested"
         );
         assert!(!workspace.path().join("target").exists());
-    }
-
-    #[tokio::test]
-    async fn validation_later_command_denial_prevents_all_execution() {
-        let workspace = tempfile::tempdir().expect("workspace");
-        std::fs::write(workspace.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
-        let marker = workspace.path().join("execution-marker");
-        let contributions = talos_tools::project_management::validation_tool_contributions(
-            workspace.path().to_owned(),
-            Arc::new(ValidationExecutionMarker(marker.clone())),
-        );
-        let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
-        engine.load_from_config(&serde_json::json!({"rules":[
-            {"decision":{"Deny":"test execution refused"},"nature":"Execute","resource":"cargo test --quiet --locked --workspace"},
-            {"decision":"Allow","nature":"Execute"}
-        ]})).expect("mixed policy");
-        let wrapped = PermissionAwareTool {
-            inner: contributions[0].tool().clone(),
-            approval: Arc::new(Mutex::new(ApprovalPrompt::new(engine))),
-            print_mode: true,
-        };
-        let result = wrapped
-            .execute(serde_json::json!({"mode":"run","profile":"workspace"}))
-            .await;
-        assert!(result.is_error);
-        assert!(
-            result.content.contains("test execution refused"),
-            "{}",
-            result.content
-        );
-        assert!(!marker.exists(), "earlier allowed checks must not start");
-    }
-
-    #[test]
-    fn validation_session_grants_are_revoked_when_host_workspace_changes() {
-        let first = tempfile::tempdir().expect("first workspace");
-        let second = tempfile::tempdir().expect("second workspace");
-        std::fs::write(first.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
-        let tools = talos_tools::project_management::validation_tool_contributions(
-            first.path().to_owned(),
-            Arc::new(ValidationExecutionMarker(first.path().join("marker"))),
-        );
-        let tool = tools[0].tool();
-        let input = serde_json::json!({"mode":"run","profile":"workspace"});
-        let facets = tool.permission_profile(&input);
-        let request = PermissionRequest::new(tool.name(), tool.provenance(), &facets, &input);
-        let context = PermissionContext::new(
-            PermissionMode::Interactive,
-            InteractionCapability::Available,
-        );
-        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
-            first.path().to_owned(),
-        ));
-        let proposal = state
-            .propose(&request, &context, GrantScope::Session)
-            .expect("concrete command proposal");
-        state
-            .approve_session(proposal, &request, &context, GrantSource::InteractiveHuman)
-            .expect("approve");
-        assert_eq!(
-            state
-                .evaluate(&request, &context)
-                .expect("evaluation")
-                .decision(),
-            PermissionDecision::Allow
-        );
-        state
-            .replace_policy(PermissionEngine::with_workspace_root(
-                second.path().to_owned(),
-            ))
-            .expect("switch workspace");
-        assert_eq!(state.grant_count().expect("grants"), 0);
-        assert_eq!(
-            state
-                .evaluate(&request, &context)
-                .expect("evaluation")
-                .decision(),
-            PermissionDecision::Ask
-        );
     }
 
     #[tokio::test]
@@ -1422,7 +1255,7 @@ mod tests {
                     validation.execution_working_directory().as_deref(),
                     Some(workspace)
                 );
-                assert!(validation.cleanup_receipt().is_some());
+                assert!(validation.cleanup_receipt().is_none());
                 let plan = validation
                     .execute(serde_json::json!({"mode":"plan","profile":"governance"}))
                     .await;

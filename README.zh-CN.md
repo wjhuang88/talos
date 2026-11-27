@@ -416,9 +416,7 @@ profile 白名单也不等于权限授权。该接口不提供任意命令或发
 明确的进度、待办或任务相关治理问题适用 summary；普通聊天、孤立代码解释和重复刷新
 未变化状态不适用。治理 manifest 或 Board、迭代索引、backlog 三个标准文件中的任意两个
 可启用 summary，小项目及 Planned 项目也适用，不要求 Active 迭代。
-验证工具独立依据项目标记发现，仅有 Cargo.toml 的项目也可使用。输入仅支持
-`mode: plan|run` 和 `profile: governance|i076|workspace`；plan 不启动命令，进程内治理检查使用 Read 准入，i076 和 workspace 的 Cargo 检查按具体命令请求 Execute 准入。两者都不修改任务记录、激活迭代或操作 Issue；缺失前置条件会如实报告，
-不会为启用工具而创建占位治理文件。
+内置工具 `validate_project` 通过相同的治理文件识别工作区。它接受 `mode: plan|run` 和可选的 `profile: governance`，在进程内规划或运行只读治理检查。
 
 ### 治理变更预览
 

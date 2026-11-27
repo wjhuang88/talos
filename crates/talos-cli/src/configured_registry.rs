@@ -143,7 +143,12 @@ mod tests {
     #[tokio::test]
     async fn configured_search_keeps_validation_bound_to_selected_workspace() {
         let root = tempfile::tempdir().expect("workspace");
-        std::fs::write(root.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        std::fs::create_dir(root.path().join(".agent-governance")).expect("directory");
+        std::fs::write(
+            root.path().join(".agent-governance/manifest.yaml"),
+            "profile: minimal\n",
+        )
+        .expect("manifest");
         let registry = build_print_tool_registry_with_search(
             Vec::new(),
             root.path().to_owned(),
@@ -151,17 +156,17 @@ mod tests {
         )
         .expect("configured registry");
         assert!(registry.is_builtin_instance("web_search"));
-        assert!(registry.get("agile_summary").is_none());
+        assert!(registry.get("agile_summary").is_some());
         let validation = registry.get("validate_project").expect("validation");
         assert_eq!(
             validation.execution_working_directory(),
             Some(root.path().to_owned())
         );
         let plan = validation
-            .execute(serde_json::json!({"mode":"plan","profile":"workspace"}))
+            .execute(serde_json::json!({"mode":"plan","profile":"governance"}))
             .await;
         assert!(!plan.is_error, "{}", plan.content);
-        assert!(plan.content.contains("cargo check --locked --workspace"));
+        assert!(plan.content.contains("internal:governance_validation"));
         let empty = tempfile::tempdir().expect("empty workspace");
         let registry = build_print_tool_registry_with_search(
             Vec::new(),
