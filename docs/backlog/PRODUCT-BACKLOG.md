@@ -1,3 +1,7 @@
+## GIT-FEATURE-001 / #1041 — standalone Git feature regression
+
+[Owner](active/GIT-FEATURE-001-standalone-ignore-dependency.md): Intake / Unclaimed. Restore existing optional ignore dependency in git feature; isolated/native CI and independent review before main integration. Separate from GIT-002 and I338.
+
 ## MCP-002 / #1033 — supervised stdio MCP cleanup (intake only)
 
 [Owner](active/MCP-002-stdio-process-supervision.md): Intake / Unclaimed. Native macOS connection-lifetime cleanup, including separate-group helpers; refine safe ownership and isolation before implementation selection. No implementation authorization.

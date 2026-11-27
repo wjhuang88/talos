@@ -1,3 +1,7 @@
+## GIT-FEATURE-001 / #1041 — standalone Git feature regression intake
+
+[Owner](backlog/active/GIT-FEATURE-001-standalone-ignore-dependency.md) / [#1041](https://github.com/wjhuang88/talos/issues/1041): Intake / Unclaimed. Missing existing ignore feature edge blocks native Git and STORE-002 E checks, and #1034. No implementation authorized; independent main correction required.
+
 ## MCP-002 / #1033 — stdio MCP process supervision intake
 
 [Owner](backlog/active/MCP-002-stdio-process-supervision.md) / [#1033](https://github.com/wjhuang88/talos/issues/1033): Intake / Unclaimed; native macOS acceptance pending. No claim or implementation; MCP-001 remains Complete.
