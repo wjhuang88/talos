@@ -59,7 +59,8 @@ impl AddPlan {
                 )
             }
             Operation::Push(input)
-                if self.phase == Phase::Mutation && self.native_push_command.is_some() =>
+                if matches!(self.phase, Phase::Mutation | Phase::PushCommandMutation)
+                    && self.native_push_command.is_some() =>
             {
                 (
                     "git:push-command/v1",

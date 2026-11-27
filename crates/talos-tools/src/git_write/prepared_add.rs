@@ -26,6 +26,8 @@ mod command_evidence;
 mod host_path;
 #[path = "prepared_add/pull_command.rs"]
 mod pull_command;
+#[path = "prepared_add/push_command.rs"]
+mod push_command;
 #[cfg(windows)]
 #[path = "prepared_add/scoop.rs"]
 mod scoop;
@@ -209,6 +211,7 @@ enum Phase {
     CheckoutChildWorktree,
     TargetConfiguration,
     PullCommandMutation,
+    PushCommandMutation,
 }
 
 pub(super) struct AddPlan {
@@ -5399,6 +5402,12 @@ impl PreparedNormalToolInvocation for AddPlan {
             ));
         };
         let result = match self.phase {
+            Phase::PushCommandMutation => {
+                return PreparedNormalStage::Complete(match self.execute_push_command().await {
+                    Ok(content) => ToolExecutionOutput::success(content),
+                    Err(error) => ToolExecutionOutput::error(error.to_string()),
+                });
+            }
             Phase::PullCommandMutation => {
                 return PreparedNormalStage::Complete(match self.execute_pull_command().await {
                     Ok(content) => ToolExecutionOutput::success(content),
@@ -5423,6 +5432,9 @@ impl PreparedNormalToolInvocation for AddPlan {
                 }),
             Phase::SenderConfiguration if matches!(self.operation, Operation::Pull(_)) => {
                 self.discover_pull_command().await
+            }
+            Phase::SenderConfiguration if matches!(self.operation, Operation::Push(_)) => {
+                self.discover_push_command().await
             }
             Phase::SenderConfiguration => self.discover_sender(&authorizations).await,
             Phase::ReceiverRoots => {

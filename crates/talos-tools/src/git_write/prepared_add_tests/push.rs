@@ -82,7 +82,7 @@ async fn retained_push_refuses_changed_invocation_before_transport() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn prepared_local_push_runs_all_eight_admitted_stages() {
+async fn prepared_local_push_preserves_maintenance_and_cancellation_with_command_authority() {
     for layout in [
         "bare",
         "normal",
@@ -293,7 +293,7 @@ async fn prepared_local_push_runs_all_eight_admitted_stages() {
                     plan.plan_identity().expect("identity"),
                 )
                 .expect("admit stage");
-            if layout == "maintenance-cancel" && stages == 8 {
+            if layout == "maintenance-cancel" && stages == 2 {
                 let receipt = plan.cleanup_receipt().expect("maintenance receipt");
                 let task =
                     tokio::spawn(async move { plan.execute_stage(Box::new(admission)).await });
@@ -381,7 +381,7 @@ async fn prepared_local_push_runs_all_eight_admitted_stages() {
                 );
                 break;
             }
-            if layout == "cancel" && stages == 8 {
+            if layout == "cancel" && stages == 2 {
                 let receipt = plan.cleanup_receipt().expect("local push receipt");
                 let task =
                     tokio::spawn(async move { plan.execute_stage(Box::new(admission)).await });
@@ -442,7 +442,7 @@ async fn prepared_local_push_runs_all_eight_admitted_stages() {
                             output
                                 .result
                                 .content
-                                .contains("partially updated remote references"),
+                                .contains("partial remote effects may remain"),
                             "{}",
                             output.result.content
                         );
@@ -451,7 +451,7 @@ async fn prepared_local_push_runs_all_eight_admitted_stages() {
                 }
             }
         }
-        assert_eq!(stages, 8);
+        assert_eq!(stages, 2);
         if layout == "cancel" {
             // Releasing the competing lock after confirmed cleanup must not
             // let a surviving receive-pack finish the reference update.
@@ -1369,19 +1369,14 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
             match plan.execute_stage(Box::new(admission)).await {
                 PreparedNormalStage::Continue(next) => plan = next,
                 PreparedNormalStage::Complete(output) => {
-                    assert!(output.result.is_error);
-                    assert!(
-                        output.result.content.contains("Mixed local and network"),
-                        "{}",
-                        output.result.content
-                    );
+                    assert!(!output.result.is_error, "{}", output.result.content);
                     break;
                 }
             }
         }
         for destination in [local.path(), receiver.path()] {
             assert!(
-                !std::process::Command::new("git")
+                std::process::Command::new("git")
                     .current_dir(destination)
                     .args(["rev-parse", "--verify", "refs/heads/mixed"])
                     .output()
@@ -1482,6 +1477,22 @@ async fn push_rejects_sender_ref_changes_after_discovery() {
 }
 
 #[tokio::test]
+async fn native_push_ssh_https_require_fresh_command_authority() {
+    for remote in ["git@example.invalid:repo.git", "ssh://git@example.invalid/repo.git", "https://example.invalid/repo.git"] {
+        let root = fixture();
+        let plan = AddPlan::prepare_push(root.path(), &serde_json::json!({"remote":remote}), ToolProvenance::Native).expect("prepare");
+        let old_identity = plan.identity.clone();
+        let next = Box::new(plan).discover_push_command().await.expect("discover without network");
+        assert!(!old_identity.same_plan(&next.identity));
+        assert!(next.phase == Phase::PushCommandMutation);
+        assert!(next.receiver_roots.is_empty());
+        assert!(next.git_command_evidence().is_some());
+        assert!(next.facets.iter().any(|facet| facet.resource.as_deref() == Some("git:push-command")));
+        next.revalidate().expect("bound command");
+    }
+}
+
+#[tokio::test]
 async fn local_push_receiver_requires_path_admission_without_receiver_reads() {
     let root = fixture();
     let receiver = root.path().join("not-created-receiver.git");
@@ -1498,7 +1509,8 @@ async fn local_push_receiver_requires_path_admission_without_receiver_reads() {
         panic!("discovery failed");
     };
     assert!(next.permission_profile().iter().any(|facet| {
-        facet.nature == ToolNature::Read && facet.resource.as_deref() == receiver.to_str()
+        facet.nature == ToolNature::Execute
+            && facet.resource.as_deref() == Some("git:push-command")
     }));
     assert!(
         !next
@@ -1506,11 +1518,10 @@ async fn local_push_receiver_requires_path_admission_without_receiver_reads() {
             .iter()
             .any(|facet| matches!(facet.nature, ToolNature::Network | ToolNature::Write))
     );
-    assert_eq!(
+    assert!(
         next.permission_profile()
             .iter()
-            .any(|facet| facet.nature == ToolNature::Execute),
-        cfg!(windows)
+            .any(|facet| facet.nature == ToolNature::Execute)
     );
     assert!(!receiver.exists());
     assert!(!root.path().join(".git/index").exists());

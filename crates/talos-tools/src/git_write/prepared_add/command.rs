@@ -129,7 +129,11 @@ impl FrozenCommand {
         if input.force {
             arguments.push("--force");
         }
-        arguments.extend(["--", input.remote.as_deref().unwrap_or("origin")]);
+        if let Some(remote) = &input.remote {
+            arguments.extend(["--", remote]);
+        } else if input.branch.is_some() {
+            arguments.extend(["--", "origin"]);
+        }
         if let Some(branch) = &input.branch {
             arguments.push(branch);
         }
