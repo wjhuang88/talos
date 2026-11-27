@@ -1,3 +1,7 @@
+## SEARCH-001-D2-T4 / I339 / #1039 — proposed bounded MCP execution
+
+[I339](I339-search-mcp-bounded-execution.md) / [Owner](../backlog/active/SEARCH-001-D2-T4-mcp-bounded-execution.md) / [#1039](https://github.com/wjhuang88/talos/issues/1039): **Active / Claimed PROPOSED via #1040**; bounded MCP search execution, I337 terminal; no default admission or supplier calls. Claim and activation ineffective until #1040 merges.
+
 ## I337 / SEARCH-001-D2-T3 — Complete / Closed
 
 [I337](I337-search-mcp-offline-observation.md) / [Owner](../backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): Complete / Closed upon owner-first publication; [source #1018](https://github.com/wjhuang88/talos/pull/1018), completion commit `9eddf0c5703d77f89bd754c5bf22c5b26bc84a6f`, CI 8/8 and independent review recommends approval. All other iterations retain their independent dispositions. #848/#624 remain open; no runtime/Auto admission.
