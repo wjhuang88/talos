@@ -1,3 +1,7 @@
+## GIT-002 — Fetch、Rebase 与 Pull 策略
+
+Refinement / Unclaimed。[任务、验收与 Required Reads](active/GIT-002-fetch-rebase-pull-strategy.md)。新增独立原生 Fetch/Rebase 工具及可选 Pull 策略；待有效认领与权限安全审查，不代表已实现。
+
 ## 会话恢复分支后续任务
 
 [归并记录与验收表](../tasks/2026-11-11-session-recovery-handoff.md)列出五项后续工作。[内部治理检查权限](active/VALIDATION-004-internal-governance-read-admission.md)进入 Refinement；Windows 验收沿用 #923。

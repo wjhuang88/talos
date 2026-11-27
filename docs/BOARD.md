@@ -1,3 +1,7 @@
+## GIT-002 — Fetch / Rebase / Pull strategy planning
+
+Refinement / Unclaimed; implementation not started. [Owner and acceptance](backlog/active/GIT-002-fetch-rebase-pull-strategy.md). Prior Git/TUI repairs are on main through `c7153ab`, with successful preflight and actual push. [Saved progress, limitations and resume steps](tasks/2026-11-27-git-tools-handoff.md).
+
 ## 会话恢复归并与剩余验收
 
 后台续跑已合入 #1030。SESSION-UI-001 补充回归进入复审；#923 等待原生 Windows 验收。权限分类待认领，审批、恢复诊断和编辑预览按原 owner 复核。[任务与验收](tasks/2026-11-11-session-recovery-handoff.md)
