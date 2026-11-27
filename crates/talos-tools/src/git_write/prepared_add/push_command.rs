@@ -1,6 +1,78 @@
 //! Native Push uses whole-command authority, including configured transports.
 use super::*;
 
+// Preserve Git's diagnostic lines while withholding URL credentials and common
+// credential fields. Arbitrary helper prose cannot be proven secret-free.
+fn push_diagnostic(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let mut result = String::new();
+    for line in text.lines() {
+        let lower = line.to_ascii_lowercase();
+        if [
+            "authorization:",
+            "password=",
+            "password:",
+            "token=",
+            "token:",
+            "secret=",
+            "api_key",
+            "private key-----",
+        ]
+        .iter()
+        .any(|key| lower.contains(key))
+        {
+            result.push_str("[credential-bearing diagnostic line redacted]\n");
+            continue;
+        }
+        for word in line.split_inclusive(char::is_whitespace) {
+            let mut safe = word.to_owned();
+            if let Some(scheme) = safe.find("://") {
+                let start = scheme + 3;
+                let end = safe[start..]
+                    .find(['/', '?', '#'])
+                    .map_or(safe.len(), |n| start + n);
+                if let Some(at) = safe[start..end].rfind('@') {
+                    safe.replace_range(start..start + at, "***");
+                }
+                if let Some(query) = safe.find(['?', '#']) {
+                    safe.truncate(query);
+                    safe.push_str("[query redacted]");
+                }
+            }
+            result.extend(safe.chars().filter(|c| !c.is_control() || *c == '\t'));
+        }
+        result.push('\n');
+        if result.len() > 16 * 1024 {
+            let mut end = 16 * 1024;
+            while !result.is_char_boundary(end) {
+                end -= 1;
+            }
+            result.truncate(end);
+            result.push_str("\n[diagnostic truncated]\n");
+            break;
+        }
+    }
+    if result.is_empty() {
+        "(empty)".into()
+    } else {
+        result
+    }
+}
+
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::push_diagnostic;
+    #[test]
+    fn preserves_rejection_and_masks_credentials() {
+        let output = push_diagnostic(b"To https://user:password@example.invalid/repo\n ! [rejected] main -> main (fetch first)\nerror: failed to push some refs\nAuthorization: Bearer secret\n");
+        assert!(output.contains("(fetch first)"));
+        assert!(output.contains("error: failed to push some refs"));
+        assert!(output.contains("https://***@example.invalid/repo"));
+        assert!(!output.contains("password"));
+        assert!(!output.contains("Bearer secret"));
+    }
+}
+
 impl AddPlan {
     pub(super) async fn discover_push_command(
         mut self: Box<Self>,
@@ -97,8 +169,10 @@ impl AddPlan {
             .await.map_err(|_| GitToolError::Git("Native Push execution failed; partial remote effects may remain; inspect before retrying".into()))?;
         if !output.status.success() {
             return Err(GitToolError::Git(format!(
-                "Native Push failed ({}); partial remote effects may remain; inspect before retrying",
-                output.status
+                "Native Push failed ({}); partial remote effects may remain; inspect before retrying\nstderr:\n{}\nstdout:\n{}",
+                output.status,
+                push_diagnostic(&output.stderr),
+                push_diagnostic(&output.stdout)
             )));
         }
         self.repository.revalidate_location()?;
