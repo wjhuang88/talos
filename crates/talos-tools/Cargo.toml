@@ -36,7 +36,7 @@ shell = [
     "tokio/fs",
     "dep:windows-sys",
 ]
-git = ["dep:rustix", "dep:uuid", "dep:cap-std", "dep:cap-fs-ext", "dep:libc", "dep:windows-sys", "dep:same-file", "tokio/rt", "dep:gix", "dep:similar", "dep:talos-permission", "dep:talos-sandbox", "tokio/fs", "tokio/io-util", "tokio/macros", "tokio/process", "tokio/time"]
+git = ["dep:ignore", "dep:rustix", "dep:uuid", "dep:cap-std", "dep:cap-fs-ext", "dep:libc", "dep:windows-sys", "dep:same-file", "tokio/rt", "dep:gix", "dep:similar", "dep:talos-permission", "dep:talos-sandbox", "tokio/fs", "tokio/io-util", "tokio/macros", "tokio/process", "tokio/time"]
 network = [
     "dep:image",
     "tokio/macros",

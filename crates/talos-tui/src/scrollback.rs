@@ -1187,6 +1187,7 @@ pub(crate) fn wrap_to_display_width(text: &str, max_width: usize) -> Vec<String>
 
 pub(crate) struct TipsComponent<'a> {
     pub(crate) compaction_pending: bool,
+    pub(crate) processing_frame: usize,
     pub(crate) tip: Option<&'a crate::state::Tip>,
     pub(crate) history_scrolled: bool,
 }
@@ -1211,7 +1212,10 @@ impl ViewportComponent for TipsComponent<'_> {
             )))
         } else if self.compaction_pending {
             Text::from(Line::from(Span::styled(
-                " Compacting context…",
+                format!(
+                    "{}Compacting context…",
+                    preview_spinner_padding(self.processing_frame).0
+                ),
                 Style::default().fg(semantic::TIP_INFO),
             )))
         } else if self.history_scrolled {

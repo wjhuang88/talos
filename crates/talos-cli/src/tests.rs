@@ -1334,7 +1334,8 @@ mod tests {
             ..Default::default()
         };
 
-        crate::mode_runtime::apply_session_model_to_config(&mut config, &session);
+        crate::mode_runtime::apply_session_model_to_config(&mut config, &session)
+            .expect("restore model");
 
         assert_eq!(config.provider, "zhipuai-coding-plan");
         assert_eq!(config.model, "glm-5.2");

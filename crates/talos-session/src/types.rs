@@ -191,6 +191,153 @@ impl Session {
         *tip = None;
         engine.compact_segment(&self.file_path, dir, max_entries)
     }
+    /// Archive the verified model-history prefix and publish its summary in the new head.
+    /// The caller checks each decoded entry against its prepared checkpoint source.
+    pub fn archive_checkpoint(
+        &self,
+        summary: &str,
+        previous: Option<(&str, usize)>,
+        covered: usize,
+        mut matches: impl FnMut(usize, &str, &talos_core::message::Message) -> bool,
+    ) -> Result<Option<String>, SessionError> {
+        let invalid =
+            || SessionError::DurableTurn("checkpoint does not match active segment".into());
+        if covered == 0
+            || summary.len() > 64 * 1024
+            || !summary.starts_with("[Derived checkpoint; source history remains authoritative]\n")
+        {
+            return Err(invalid());
+        }
+        let entries = self.store.read_entries(&self.file_path)?;
+        // A legacy count-only head is restored from multiple archives. Its
+        // physical records cannot authenticate that reconstructed prefix.
+        // Preserve that archive chain and allow the live projection to apply.
+        if entries.first().is_some_and(|entry| {
+            crate::archive_recovery::placeholder(entry)
+                && crate::archive_recovery::checkpoint_summary(entry).is_none()
+        }) {
+            return Ok(None);
+        }
+        let mut decoder = crate::jsonl::HistoryMessageDecoder::default();
+        let mut cursor = 0;
+        let mut end = None;
+        let mut first_system = None;
+        for (index, entry) in entries.iter().enumerate() {
+            let decoded = decoder.decode(entry.clone());
+            if index == 0
+                && let Some((prior, count)) = previous
+                && crate::archive_recovery::checkpoint_summary(entry) == Some(prior)
+            {
+                cursor = count;
+                continue;
+            }
+            // A running actor may still bind the original history after the
+            // in-memory projection was invalidated. Authenticate its covered
+            // prefix against the immutable archive before advancing the cursor.
+            if index == 0
+                && crate::archive_recovery::checkpoint_summary(entry).is_some()
+                && decoded
+                    .as_ref()
+                    .is_some_and(|(id, msg)| !matches(0, id, msg))
+            {
+                let retained = entries.get(1).ok_or_else(invalid)?;
+                let boundary = entry
+                    .content
+                    .split_once("\nCovered through: ")
+                    .and_then(|(_, rest)| rest.lines().next())
+                    .ok_or_else(invalid)?;
+                let last = if boundary == "-" {
+                    retained.parent_id.as_deref().ok_or_else(invalid)?
+                } else {
+                    boundary
+                };
+                let evidence = self.inspect_archive_recovery(
+                    std::time::Instant::now() + std::time::Duration::from_secs(30),
+                    || false,
+                )?;
+                let prefix_end = evidence
+                    .entries()
+                    .iter()
+                    .position(|old| old.id == last)
+                    .ok_or_else(invalid)?;
+                let mut originals = crate::jsonl::HistoryMessageDecoder::default();
+                for old in &evidence.entries()[..=prefix_end] {
+                    if let Some((id, msg)) = originals.decode(old.clone())
+                        && !matches!(msg, talos_core::message::Message::System { .. })
+                    {
+                        if !matches(cursor, &id, &msg) {
+                            return Err(invalid());
+                        }
+                        cursor += 1;
+                    }
+                }
+                if cursor == covered {
+                    let _guard = self
+                        .write_lock
+                        .lock()
+                        .map_err(|_| SessionError::LockPoisoned)?;
+                    let current = self.store.read_entries(&self.file_path)?;
+                    if current.len() != entries.len()
+                        || current.iter().zip(&entries).any(|(a, b)| {
+                            crate::compact_text::encode_entry(a)
+                                != crate::compact_text::encode_entry(b)
+                        })
+                    {
+                        return Err(invalid());
+                    }
+                    return Ok(
+                        crate::archive_recovery::checkpoint_summary(entry).map(str::to_owned)
+                    );
+                }
+                continue;
+            }
+            if let Some((id, message)) = decoded {
+                if matches!(message, talos_core::message::Message::System { .. }) {
+                    first_system.get_or_insert(index);
+                    continue;
+                }
+                if !matches(cursor, &id, &message) {
+                    return Err(SessionError::DurableTurn(format!(
+                        "checkpoint source mismatch at entry {index}, model position {cursor}, role {}",
+                        entry.role
+                    )));
+                }
+                cursor += 1;
+                if cursor == covered {
+                    end = Some(index + 1);
+                    break;
+                }
+            }
+        }
+        let end = end.ok_or_else(invalid)?;
+        let retain = entries.len() - first_system.unwrap_or(end);
+        let through = if first_system.is_some() {
+            entries[end - 1].id.as_str()
+        } else {
+            "-"
+        };
+        let _lock = self
+            .write_lock
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        let engine = crate::compaction_engine::CompactionEngine::new(Arc::clone(&self.store));
+        let dir = self.file_path.parent().ok_or_else(invalid)?;
+        *self
+            .last_entry_id
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)? = None;
+        let result = engine.compact_bound(
+            &self.file_path,
+            dir,
+            retain,
+            Some((&entries, summary, through)),
+        )?;
+        if matches!(result, crate::compaction_engine::CompactionResult::Skipped) {
+            return Err(invalid());
+        }
+        Ok(None)
+    }
+
     /// Create a new session with a single empty root branch.
     /// The file path MUST already exist on disk.
     pub fn new(id: Uuid, project: String, workspace_root: String, file_path: PathBuf) -> Self {

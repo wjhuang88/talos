@@ -11,6 +11,8 @@ use crate::request_plan::ProviderRequestPlan;
 use crate::token::TokenEstimator;
 use crate::transient_text::PrivateTokens;
 
+pub(crate) const CHECKPOINT_TIMEOUT: Duration = Duration::from_secs(900);
+
 impl Agent {
     #[cfg(test)]
     pub(crate) async fn checkpoint_request_once(
@@ -34,7 +36,9 @@ impl Agent {
     ) -> CompactionResult<()> {
         let deadline = source
             .and_then(crate::compaction::HistorySource::deadline)
-            .unwrap_or_else(|| tokio::time::Instant::now() + Duration::from_secs(120));
+            .unwrap_or_else(|| {
+                tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT
+            });
         check_checkpoint_deadline(deadline)?;
         let definitions: Vec<_> = plan
             .tool_definitions
@@ -93,7 +97,7 @@ impl Agent {
             context_limit,
             private,
             None,
-            tokio::time::Instant::now() + Duration::from_secs(120),
+            tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT,
         )
         .await
     }
@@ -345,6 +349,29 @@ impl Agent {
             let mut generated_bytes = 0usize;
             let mut calls = 0usize;
             let mut cursor = 0usize;
+            // Resume the fold only when every old source still identifies the
+            // same entry in the exact prefix admitted for this request.
+            let previous = self
+                .checkpoint_projection_state
+                .lock()
+                .ok()
+                .and_then(|slot| slot.clone());
+            if let (Some(previous), Some(source)) = (previous, source)
+                && previous.context_limit == context_limit
+                && previous.private.same_tokens(private)
+                && previous.source.generation() == source.generation()
+                && previous.source.revision() <= source.revision()
+                && eligible.starts_with(&previous.covered)
+                && previous
+                    .covered
+                    .iter()
+                    .all(|&index| previous.source.same_entry(source, index))
+                && let Some(summary) = previous.content.strip_prefix(CHECKPOINT_HEADER)
+            {
+                cursor = previous.covered.len();
+                allowed.extend(references[..cursor].iter().cloned());
+                rendered = summary.to_owned();
+            }
             let mut text_offset = 0usize;
             while cursor < eligible.len() {
                 let mut sources = Vec::new();
@@ -593,9 +620,7 @@ impl Agent {
         for (index, message) in plan.messages.iter().enumerate() {
             if index == first {
                 candidate.push(Message::Context {
-                    content: format!(
-                        "[Derived checkpoint; source history remains authoritative]\n{rendered}"
-                    ),
+                    content: format!("{CHECKPOINT_HEADER}{rendered}"),
                 });
             }
             if eligible.binary_search(&index).is_err() {
@@ -617,9 +642,7 @@ impl Agent {
                 parent_sequence: None,
                 source: source.clone(),
                 covered: eligible,
-                content: format!(
-                    "[Derived checkpoint; source history remains authoritative]\n{rendered}"
-                ),
+                content: format!("{CHECKPOINT_HEADER}{rendered}"),
                 context_limit,
                 private: private.clone(),
             };
@@ -636,6 +659,8 @@ impl Agent {
         Ok(())
     }
 }
+
+const CHECKPOINT_HEADER: &str = "[Derived checkpoint; source history remains authoritative]\n";
 
 fn segment_text(message: &Message) -> Option<std::borrow::Cow<'_, str>> {
     use std::borrow::Cow;
@@ -1107,7 +1132,8 @@ mod tests {
             (false, false, 0, 2, true),
             (true, false, 0, 2, false),
             (false, true, 0, 1, false),
-            (false, false, 70, 2, false),
+            (false, false, 185, 2, true),
+            (false, false, 470, 2, false),
         ] {
             let provider = Arc::new(OversizedSummaryProvider {
                 requests: Mutex::new(vec![]),
@@ -1130,7 +1156,7 @@ mod tests {
                 .checkpoint_request(&mut plan, 128_000, &PrivateTokens::default())
                 .await;
             assert_eq!(result.is_ok(), succeeds, "{result:?}");
-            assert!(started.elapsed() <= Duration::from_secs(120));
+            assert!(started.elapsed() <= CHECKPOINT_TIMEOUT);
             if !succeeds {
                 assert_eq!(plan.messages, raw);
             } else {
@@ -2389,6 +2415,40 @@ mod tests {
         assert!(calls > 0);
         assert!(first.messages.len() < raw.len());
         assert_eq!(raw, original);
+        // At a tool boundary the retained tail can grow without making another
+        // user exchange eligible. Both entry points must keep the installed view.
+        let mut tool_tail = raw.clone();
+        let mut effective = first.messages.clone();
+        while agent.estimate_provider_request_tokens(&effective, &[]) < limit * 96 / 100 {
+            let update = Message::Context {
+                content: "recent tool boundary ".repeat(10),
+            };
+            tool_tail.push(update.clone());
+            effective.push(update);
+        }
+        let growing_source = bind(&tool_tail, 7);
+        let mut growing_plan = first.clone();
+        growing_plan.messages = tool_tail;
+        growing_plan.estimated_tokens =
+            agent.estimate_provider_request_tokens(&growing_plan.messages, &[]);
+        let effective_estimate = agent.estimate_provider_request_tokens(&effective, &[]);
+        assert!(
+            matches!(agent.prepare_manual_checkpoint(&mut growing_plan, limit,
+            &PrivateTokens::default(), &growing_source, tokio::time::Instant::now() + Duration::from_secs(120)).await,
+            crate::checkpoint_manual::ManualCheckpointResult::Outcome(talos_core::session::CompactOutcome::NotEligible { before }) if before == effective_estimate)
+        );
+        let sealed = agent
+            .seal_observed_request_plan(
+                growing_plan,
+                Some(limit),
+                &PrivateTokens::default(),
+                Some(&growing_source),
+                None,
+            )
+            .await
+            .expect("admit tool tail");
+        assert!(sealed.messages.starts_with(&effective));
+        assert_eq!(provider.requests.lock().expect("capture").len(), calls);
         raw.push(Message::User {
             content: "next turn: retain prior constraints".into(),
         });
@@ -2418,7 +2478,7 @@ mod tests {
             .expect("cache")
             .clone()
             .expect("projection");
-        let mut cancelled_plan = ProviderRequestPlan {
+        let cancelled_plan = ProviderRequestPlan {
             messages: raw.clone(),
             tool_definitions: vec![],
             estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
@@ -2428,8 +2488,7 @@ mod tests {
         };
         {
             let private = PrivateTokens::default();
-            let pending =
-                agent.reuse_checkpoint_projection(&mut cancelled_plan, &source, limit, &private);
+            let pending = agent.verified_checkpoint_view(&cancelled_plan, &source, limit, &private);
             tokio::pin!(pending);
             tokio::select! { biased;
                 _ = &mut pending => panic!("reuse must yield before scanning"),
@@ -2459,25 +2518,6 @@ mod tests {
             }
         }
         let pressured_source = bind(&pressured, 7);
-        let mut candidate = ProviderRequestPlan {
-            messages: pressured.clone(),
-            tool_definitions: vec![],
-            estimated_tokens: agent.estimate_provider_request_tokens(&pressured, &[]),
-            ephemeral_image_tokens: 0,
-            omitted_tool_exchanges: 0,
-            tool_protocol: ToolProtocol::Native,
-        };
-        assert!(
-            !agent
-                .reuse_checkpoint_projection(
-                    &mut candidate,
-                    &pressured_source,
-                    limit,
-                    &PrivateTokens::default()
-                )
-                .await
-        );
-        assert_eq!(candidate.messages, pressured);
         let _ = agent
             .seal_provider_request_plan(
                 &context,
@@ -2528,7 +2568,7 @@ mod tests {
             if case == "private" {
                 private.extend(["new-private-token".into()]);
             }
-            let mut candidate = ProviderRequestPlan {
+            let candidate = ProviderRequestPlan {
                 messages: raw.clone(),
                 tool_definitions: vec![],
                 estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
@@ -2537,14 +2577,15 @@ mod tests {
                 tool_protocol: ToolProtocol::Native,
             };
             assert!(
-                !agent
-                    .reuse_checkpoint_projection(
-                        &mut candidate,
+                agent
+                    .verified_checkpoint_view(
+                        &candidate,
                         &source,
                         if case == "capacity" { limit + 1 } else { limit },
                         &private
                     )
-                    .await,
+                    .await
+                    .is_none(),
                 "{case}"
             );
             assert_eq!(candidate.messages, raw);
@@ -2564,7 +2605,7 @@ mod tests {
             content: "changed original constraint".repeat(200),
         };
         let changed = bind(&raw, 7);
-        let mut candidate = ProviderRequestPlan {
+        let candidate = ProviderRequestPlan {
             messages: raw.clone(),
             tool_definitions: vec![],
             estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
@@ -2573,14 +2614,10 @@ mod tests {
             tool_protocol: ToolProtocol::Native,
         };
         assert!(
-            !agent
-                .reuse_checkpoint_projection(
-                    &mut candidate,
-                    &changed,
-                    limit,
-                    &PrivateTokens::default()
-                )
+            agent
+                .verified_checkpoint_view(&candidate, &changed, limit, &PrivateTokens::default())
                 .await
+                .is_none()
         );
         assert_eq!(candidate.messages, raw);
         assert!(

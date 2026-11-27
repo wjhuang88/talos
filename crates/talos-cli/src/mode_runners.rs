@@ -38,8 +38,8 @@ use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
 pub(crate) use crate::mode_runtime::apply_session_model_to_config;
 use crate::mode_runtime::{
-    apply_mcp_fixture_config, ensure_session_runtime_identity, maybe_set_memory_provider,
-    reconcile_session_runtime_state, session_metadata_for_model, set_todo_prompt_provider,
+    apply_mcp_fixture_config, maybe_set_memory_provider, session_metadata_for_model,
+    set_todo_prompt_provider,
 };
 use crate::model_lifecycle::{
     RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
@@ -320,11 +320,11 @@ pub(crate) async fn run_tui_mode(
     )?;
     let runtime_lease = talos_session::SessionRuntimeLease::acquire(&session.file_path)
         .context("cannot acquire TUI session runtime ownership")?;
-    reconcile_session_runtime_state(&session)?;
-    apply_session_model_to_config(&mut config, &session);
-    if !config.model.is_empty() {
-        ensure_session_runtime_identity(&config, &session)?;
-    }
+    crate::mode_runtime::prepare_resumed_model(
+        &mut config,
+        &session,
+        cli.model.is_some() || cli.provider.is_some(),
+    )?;
     dashboard_activity.project_session(&session.id.to_string());
     dashboard_activity.project_model(&config.provider, &config.model);
 

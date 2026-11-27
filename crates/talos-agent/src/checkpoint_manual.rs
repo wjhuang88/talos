@@ -40,7 +40,7 @@ impl Agent {
         recovered: Option<&HistorySource>,
         measurement: Option<&std::sync::Mutex<Option<u32>>>,
     ) -> ManualCheckpointResult {
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+        let deadline = tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT;
         let mut measured_before = None;
         // Dropping this entire future cancels preparation as well as provider I/O.
         tokio::time::timeout_at(deadline, async {
@@ -119,7 +119,15 @@ impl Agent {
         source: &HistorySource,
         deadline: tokio::time::Instant,
     ) -> ManualCheckpointResult {
-        let before = plan.estimated_tokens;
+        let effective = self
+            .verified_checkpoint_view(plan, source, limit, private)
+            .await;
+        let before = effective
+            .as_ref()
+            .map_or(plan.estimated_tokens, |(view, _)| view.estimated_tokens);
+        if matches!(effective, Some((_, false))) {
+            return ManualCheckpointResult::Outcome(CompactOutcome::NotEligible { before });
+        }
         if tokio::time::Instant::now() >= deadline {
             return ManualCheckpointResult::Outcome(CompactOutcome::FailedWithEstimate {
                 before,
@@ -142,6 +150,9 @@ impl Agent {
         )
         .await;
         match (result, projection) {
+            (Ok(Ok(())), Some(_)) if plan.estimated_tokens >= before => {
+                ManualCheckpointResult::Outcome(CompactOutcome::NotEligible { before })
+            }
             (Ok(Ok(())), Some(projection)) => ManualCheckpointResult::Candidate {
                 projection: Box::new(projection),
                 before,

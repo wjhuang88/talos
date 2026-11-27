@@ -316,7 +316,7 @@ impl HistorySource {
     /// The caller supplies the persistence boundary, never a hook-built request.
     /// A failed or cancelled scan leaves the preceding mapping unchanged.
     pub async fn bind_continuation(&mut self, messages: &[Message], persist_start: usize) -> bool {
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+        let deadline = tokio::time::Instant::now() + crate::checkpoint_request::CHECKPOINT_TIMEOUT;
         self.bind_continuation_until(messages, persist_start, deadline)
             .await
     }

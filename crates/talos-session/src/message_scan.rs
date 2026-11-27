@@ -32,6 +32,7 @@ pub struct SessionMessageScan {
     last_entry: Option<crate::SessionEntry>,
     complete: bool,
     archive_placeholder: bool,
+    semantic_head: bool,
     through_entry: Option<String>,
     selected_end: Option<u64>,
     last_entry_end: u64,
@@ -113,6 +114,7 @@ impl crate::Session {
             last_entry: None,
             complete: false,
             archive_placeholder: false,
+            semantic_head: false,
             through_entry: None,
             selected_end: None,
             last_entry_end: 0,
@@ -126,6 +128,10 @@ impl SessionMessageScan {
     /// semantic summary. This flag never authorizes an archive by itself.
     pub fn has_archive_placeholder(&self) -> bool {
         self.archive_placeholder
+    }
+    /// Whether this active segment opens with a durable semantic checkpoint.
+    pub fn has_checkpoint_head(&self) -> bool {
+        self.semantic_head
     }
     /// Read the next raw copy page from this same captured source version.
     ///
@@ -219,8 +225,13 @@ impl SessionMessageScan {
         let mut decoder = self.decoder.clone();
         let mut messages = Vec::new();
         let mut archive_placeholder = self.archive_placeholder;
+        let mut first = self.last_entry.is_none();
         for (entry, range) in page.entries.into_iter().zip(page.record_ranges) {
             check()?;
+            if first {
+                self.semantic_head = crate::archive_recovery::checkpoint_summary(&entry).is_some();
+                first = false;
+            }
             archive_placeholder |= crate::archive_recovery::placeholder(&entry);
             let selected = self.through_entry.as_deref() == Some(entry.id.as_str());
             if selected && selected_end.is_some() {
@@ -400,6 +411,9 @@ impl SessionMessageScan {
     ) -> Result<(), HistoryPageError> {
         if stopped() || Instant::now() >= deadline {
             return Err(HistoryPageError::Stopped);
+        }
+        if !self.decoder.complete() {
+            return Err(HistoryPageError::InvalidRecord);
         }
         if !self.complete {
             return Err(HistoryPageError::Stopped);

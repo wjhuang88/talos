@@ -303,7 +303,7 @@ fn rewrite_records(
             if !appended.is_empty()
                 || prepended.len() != 1
                 || !crate::archive_recovery::placeholder(&prepended[0])
-                || prepended[0].content
+                || prepended[0].content.lines().next().unwrap_or_default()
                     != format!(
                         "[Compaction summary: {retain_from} earlier entries summarized, {} recent entries preserved]",
                         prior.len() - retain_from

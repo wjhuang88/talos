@@ -815,6 +815,27 @@ fn thinking_preview_uses_smooth_slow_color_wave() {
 }
 
 #[test]
+fn compaction_tip_animates_while_idle() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.state.compaction_pending = true;
+    for spinner in &SPINNER_FRAMES[..2] {
+        tui.draw_frame().expect("compaction frame");
+        assert!(tui.visible_processing_animation);
+        assert!(
+            tui.terminal
+                .test_rendered_text()
+                .contains(&format!("{spinner} Compacting context…"))
+        );
+        tui.advance_processing_frame();
+    }
+    tui.state.compaction_pending = false;
+    tui.draw_frame().expect("idle frame");
+    assert!(!tui.visible_processing_animation);
+}
+
+#[test]
 fn processing_frames_advance_only_on_timer_ticks() {
     let frame = 7;
     assert_eq!(frame, 7, "redraw-only work must not mutate animation state");

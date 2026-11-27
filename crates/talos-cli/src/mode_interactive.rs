@@ -71,7 +71,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         let outcome: Result<Option<talos_session::Session>> = async {
             let runtime_lease = talos_session::SessionRuntimeLease::acquire(&session.file_path)
                 .context("cannot acquire interactive session runtime ownership")?;
-            prepare_interactive_session_identity(&mut config, &session)?;
+            crate::mode_runtime::prepare_resumed_model(&mut config, &session, cli.model.is_some() || cli.provider.is_some())?;
             if config.model.is_empty() && !cli.mock {
                 bail!(
                     "no model configured. Set 'model' in ~/.talos/config.toml, pass --model, or run `talos` in TUI mode for the setup wizard."
@@ -268,16 +268,12 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }
 }
 
+#[cfg(test)]
 fn prepare_interactive_session_identity(
     config: &mut Config,
     session: &talos_session::Session,
 ) -> Result<()> {
-    crate::mode_runtime::reconcile_session_runtime_state(session)?;
-    crate::mode_runtime::apply_session_model_to_config(config, session);
-    if !config.model.is_empty() {
-        crate::mode_runtime::ensure_session_runtime_identity(config, session)?;
-    }
-    Ok(())
+    crate::mode_runtime::prepare_resumed_model(config, session, true)
 }
 
 #[cfg(test)]
@@ -285,7 +281,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn interactive_resume_uses_persisted_identity_after_default_model_changes() {
+    fn interactive_resume_uses_current_model_and_preserves_activation_fencing() {
         let root = tempfile::tempdir().expect("root");
         let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
         let session = manager.create_session("identity", "").expect("session");
@@ -302,27 +298,27 @@ mod tests {
             .runtime_state()
             .expect("state")
             .expect("identity");
-        assert_eq!(state.activation.target.model, "gpt-4o");
-        assert_eq!(changed.model, "gpt-4o");
+        assert_eq!(state.activation.target.model, "gpt-4o-mini");
+        assert_eq!(changed.model, "gpt-4o-mini");
         assert_eq!(changed.provider, "openai");
         changed.model.clear();
         prepare_interactive_session_identity(&mut changed, &session)
             .expect("resume with empty default");
-        assert_eq!(changed.model, "gpt-4o");
+        assert_eq!(changed.model, "gpt-4o-mini");
         let store = talos_session::PendingSubmissionStore::for_session(&session);
         let activation = talos_session::SessionRuntimeActivation::new(
-            1,
+            state.activation.generation + 1,
             state.activation.target,
             talos_session::SessionRuntimeIdentity::new("openai", "gpt-4o-mini", None),
         );
         store
-            .stage_runtime_activation(0, &activation)
+            .stage_runtime_activation(state.activation.generation, &activation)
             .expect("stage without transcript commit");
         let before = store.runtime_state().expect("before");
         let transcript = std::fs::read(&session.file_path).expect("transcript");
         assert!(prepare_interactive_session_identity(&mut changed, &session).is_err());
         assert_eq!(store.runtime_state().expect("after"), before);
-        assert_eq!(changed.model, "gpt-4o");
+        assert_eq!(changed.model, "gpt-4o-mini");
         assert_eq!(
             std::fs::read(&session.file_path).expect("unchanged"),
             transcript

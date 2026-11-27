@@ -296,8 +296,8 @@ async fn fifty_tool_turns_preserve_semantics_raw_export_and_durable_restart() {
     );
     assert!(applied >= 2, "repeated checkpoints required, got {applied}");
     assert!(
-        model.summary_calls.load(Ordering::SeqCst) > applied,
-        "multi-chunk folding required"
+        model.summary_calls.load(Ordering::SeqCst) == applied,
+        "each incremental checkpoint fits one summary request in this fixture"
     );
     assert!(model.checkpoint_dispatches.load(Ordering::SeqCst) > 0);
     let raw = durable.read_messages().expect("raw recovery");
@@ -543,13 +543,30 @@ async fn text_heavy_manual_fold(fork: bool, cli_persistence: bool) {
             break;
         }
     }
-    assert_eq!(
-        reopened
+    if cli_persistence {
+        let head = reopened.session().read_entries().expect("rotated head");
+        assert!(head[0].content.contains("[Derived checkpoint;"));
+        let evidence = reopened
             .session()
-            .snapshot_bytes()
-            .expect("unchanged bytes"),
-        saved
-    );
+            .inspect_archive_recovery(std::time::Instant::now() + Duration::from_secs(10), || {
+                false
+            })
+            .expect("archive evidence");
+        assert_eq!(
+            evidence
+                .into_restored_history(std::time::Instant::now() + Duration::from_secs(10), || {
+                    false
+                })
+                .expect("archived history")
+                .0,
+            raw
+        );
+    } else {
+        assert_eq!(
+            reopened.session().snapshot_bytes().expect("original head"),
+            saved
+        );
+    }
     assert!(
         model.segmented_sources.load(Ordering::SeqCst) > 1,
         "oversized single text must be segmented"

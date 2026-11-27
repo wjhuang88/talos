@@ -131,7 +131,9 @@ impl Tui {
                 crate::scrollback::preview_spinner_padding(self.processing_frame);
             (padding, Some(semantic::PROCESSING_SPINNER[color_idx]))
         } else {
-            self.processing_frame = 0;
+            if !state.compaction_pending {
+                self.processing_frame = 0;
+            }
             ("   ".to_string(), None)
         };
         let hold_status = self.stream_render.hold_status().cloned();
@@ -173,6 +175,7 @@ impl Tui {
         let tips = crate::scrollback::TipsComponent {
             tip: state.tip.as_ref(),
             compaction_pending: state.compaction_pending,
+            processing_frame: self.processing_frame,
             history_scrolled: !matches!(
                 self.history_scroll.mode,
                 crate::history_projection::HistoryScrollMode::FollowTail
@@ -477,7 +480,12 @@ impl Tui {
                         .iter()
                         .take(usize::from(area.height))
                         .any(|row| !tool_preview_active || !row.prefix.trim().is_empty())
-            });
+            })
+            || (state.compaction_pending
+                && state.tip.is_none()
+                && app_layout
+                    .tips
+                    .is_some_and(|area| area.width > 1 && area.height > 0));
         self.terminal
             .draw_with_cursor(screen_size, cursor, |frame| {
                 if let Some(area) = app_layout.history {
