@@ -1,6 +1,6 @@
 # I335: Bing Dual Host Real Transport + Explicit Opt-in (SEARCH-001-D3-T5)
 
-> Document status: Complete / Closed for bounded I335 source implementation **upon owner-first closeout merge**; external #1000 rights and #957 live/default remain unapproved.
+> Document status: Complete / Closed for bounded I335 source implementation; external #1000 rights and #957 live/default remain unapproved.
 > Selection: 2026-11-22. Maintainer prioritizes working functionality over supplier-rights research.
 > Goal: Complete an executable, secure, permission-aware WWW-first/CN-fallback search path without changing the default network route or equating implementation with licensing.
 
@@ -8,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | I335 / D3-T5 #1001: real transport, explicit opt-in, deterministic offline transport fixtures; no default/live admission |
@@ -18,8 +18,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer directed code-only implementation 2026-11-22; claim #1002 merged `1b3fc18bc323ffe71603766ecc6c0e61afa13412`; source #1003 exact-head [CI 8/8](https://github.com/wjhuang88/talos/actions/runs/45160764389), independent [APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725) and merge CAS; #1000 rights separate. |
 | Implementation PR | [#1003 MERGED](https://github.com/wjhuang88/talos/pull/1003); **Completion Commit: `bab2bdf31fc8200758397d38077dab57b9dd1aa4`** |
-| Last Updated | 2026-11-23 |
-| Handoff / Release Condition | I335 source Complete / Closed upon governance closeout publication and #1001 Issue synchronization; Gate-0/#1000, #957 live/default, #937/#624 remain separately Open/Blocked |
+| Last Updated | 2026-11-27 |
+| Handoff / Release Condition | I335 source Complete / Closed; #1011 merged and #1001 Closed; Gate-0/#1000, #957 live/default, #937/#624 remain separately Open/Blocked |
 
 ## Selected Story / current owner inventory
 
@@ -46,3 +46,7 @@
 The existing source [PR #1003](https://github.com/wjhuang88/talos/pull/1003) merged the reviewed HEAD `e255c6d521cdc47377796a4c473a5503ac4586a7`. [CI #45160764389](https://github.com/wjhuang88/talos/actions/runs/45160764389) completed all eight applicable jobs SUCCESS; [independent Copilot protected-review APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725) recorded no source/API/Network/security blocker. Latest-main merge CAS was satisfied without unrelated rebase. Status closeout is owner-first and effective when published, not on draft PR creation.
 
 Actual code is a real bounded `SearchTransport::execute_prepared` with both-host authority obtained before send and explicit `[search] backend = "bing-dual"` opt-in; typed source-local WWW→CN fallback only, same proxy/manifest/budget/cancellation, no foreign redirects, forbidden HTTP/CAPTCHA/parser-error rotations, and no changes to default DDG-first/CN-only Auto or public Tool schema. Tests use local fixtures, no external Bing calls. First-attempt intermittent macOS Fork and Windows Actor failures are preserved historically; same-head rerun succeeded. Rollback is opt-in disablement. This completion **does not close** Gate-0 #1000 rights, T3b/#957 live/default activation, D3 #937 or Epic #624.
+
+## Terminal-state reconciliation — 2026-11-27
+
+[#1011](https://github.com/wjhuang88/talos/pull/1011) merged `87404cc5dfd91369ab40110714ef2f20a8acaf23` on 2026-11-23; exact-head [closeout CI](https://github.com/wjhuang88/talos/actions/runs/45197653090) succeeded on `2965227daf7a5f3cbceda8c43a88a510f145ec30`, and #1001 is Closed. The original closeout published completion wording but omitted the terminal Claim State field. This follow-up corrects that field and stale derived views; it is not a new claim, source implementation, or replacement Completion Commit. Source Completion Commit remains `bab2bdf31fc8200758397d38077dab57b9dd1aa4`. #1000, #957, #937 and #624 remain Open; no new live/default authorization.

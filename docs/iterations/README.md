@@ -2,9 +2,9 @@
 
 [I337](I337-search-mcp-offline-observation.md) / [Owner](../backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): Complete / Closed upon owner-first publication; [source #1018](https://github.com/wjhuang88/talos/pull/1018), completion commit `9eddf0c5703d77f89bd754c5bf22c5b26bc84a6f`, CI 8/8 and independent review recommends approval. All other iterations retain their independent dispositions. #848/#624 remain open; no runtime/Auto admission.
 
-## I335 / SEARCH-001-D3-T5 — proposed real Bing transport / explicit opt-in
+## I335 / SEARCH-001-D3-T5 — Complete / Closed (explicit opt-in only)
 
-[Iteration](I335-search-bing-dual-runtime.md) / [owner](../backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [#1001](https://github.com/wjhuang88/talos/issues/1001): Active / Claimed PROPOSED via #1002, no code before effective merge; I333 fully complete and not replayed, Gate-0/#1000 independent; zero default WWW exposure.
+[Iteration](I335-search-bing-dual-runtime.md) / [owner](../backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [#1001](https://github.com/wjhuang88/talos/issues/1001): **Complete / Closed**; claim #1002 effective before source #1003; Completion Commit `bab2bdf31fc8200758397d38077dab57b9dd1aa4`; [#1011](https://github.com/wjhuang88/talos/pull/1011) merged `87404cc5dfd91369ab40110714ef2f20a8acaf23`; #1001 Closed. Gate-0/#1000 and #957 live/default remain blocked; default Auto unchanged.
 
 ## I333 / SEARCH-001-D3-T4 — Complete / Closed on owner-first closeout (offline-only)
 
