@@ -208,10 +208,6 @@ impl Session {
         {
             return Err(invalid());
         }
-        let _lock = self
-            .write_lock
-            .lock()
-            .map_err(|_| SessionError::LockPoisoned)?;
         let entries = self.store.read_entries(&self.file_path)?;
         // A legacy count-only head is restored from multiple archives. Its
         // physical records cannot authenticate that reconstructed prefix.
@@ -233,6 +229,51 @@ impl Session {
                 && crate::archive_recovery::checkpoint_summary(entry) == Some(prior)
             {
                 cursor = count;
+                continue;
+            }
+            // A running actor may still bind the original history after the
+            // in-memory projection was invalidated. Authenticate its covered
+            // prefix against the immutable archive before advancing the cursor.
+            if index == 0
+                && crate::archive_recovery::checkpoint_summary(entry).is_some()
+                && decoded
+                    .as_ref()
+                    .is_some_and(|(id, msg)| !matches(0, id, msg))
+            {
+                let retained = entries.get(1).ok_or_else(invalid)?;
+                let boundary = entry
+                    .content
+                    .split_once("\nCovered through: ")
+                    .and_then(|(_, rest)| rest.lines().next())
+                    .ok_or_else(invalid)?;
+                let last = if boundary == "-" {
+                    retained.parent_id.as_deref().ok_or_else(invalid)?
+                } else {
+                    boundary
+                };
+                let evidence = self.inspect_archive_recovery(
+                    std::time::Instant::now() + std::time::Duration::from_secs(30),
+                    || false,
+                )?;
+                let prefix_end = evidence
+                    .entries()
+                    .iter()
+                    .position(|old| old.id == last)
+                    .ok_or_else(invalid)?;
+                let mut originals = crate::jsonl::HistoryMessageDecoder::default();
+                for old in &evidence.entries()[..=prefix_end] {
+                    if let Some((id, msg)) = originals.decode(old.clone())
+                        && !matches!(msg, talos_core::message::Message::System { .. })
+                    {
+                        if !matches(cursor, &id, &msg) {
+                            return Err(invalid());
+                        }
+                        cursor += 1;
+                    }
+                }
+                if cursor == covered {
+                    return Ok(());
+                }
                 continue;
             }
             if let Some((id, message)) = decoded {
@@ -260,6 +301,10 @@ impl Session {
         } else {
             "-"
         };
+        let _lock = self
+            .write_lock
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
         let engine = crate::compaction_engine::CompactionEngine::new(Arc::clone(&self.store));
         let dir = self.file_path.parent().ok_or_else(invalid)?;
         *self

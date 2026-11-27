@@ -2068,3 +2068,33 @@ fn paged_history_decoder_preserves_tool_pairing_across_page_boundary() {
             .expect("reference history")
     );
 }
+
+#[test]
+fn live_checkpoint_rebinds_rotated_head_after_projection_cache_loss() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = crate::SessionManager::with_dir(root.path().into());
+    let session = manager.create_session("checkpoint", "").expect("session");
+    for i in 0..20 {
+        session
+            .append(&Message::User {
+                content: format!("turn {i}"),
+            })
+            .expect("append");
+    }
+    let original = session.read_messages_with_entry_ids().expect("history");
+    let verify = |i: usize, id: &str, msg: &Message| {
+        original
+            .get(i)
+            .is_some_and(|(expected, m)| expected == id && m == msg)
+    };
+    let header = "[Derived checkpoint; source history remains authoritative]\n";
+    session
+        .archive_checkpoint(&format!("{header}first"), None, 6, verify)
+        .expect("first");
+    session
+        .archive_checkpoint(&format!("{header}second"), None, 9, verify)
+        .expect("second");
+    let history = session.read_messages().expect("restored");
+    assert!(matches!(&history[0], Message::Context{content} if content.ends_with("second")));
+    assert_eq!(history.len(), 12);
+}
