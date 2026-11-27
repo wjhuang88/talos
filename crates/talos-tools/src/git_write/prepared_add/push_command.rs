@@ -3,7 +3,7 @@ use super::*;
 
 // Preserve Git's diagnostic lines while withholding URL credentials and common
 // credential fields. Arbitrary helper prose cannot be proven secret-free.
-fn push_diagnostic(bytes: &[u8]) -> String {
+pub(super) fn push_diagnostic(bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes);
     let mut result = String::new();
     for line in text.lines() {

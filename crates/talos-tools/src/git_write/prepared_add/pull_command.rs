@@ -95,11 +95,13 @@ impl AddPlan {
             "Native Pull execution failed: {error}; partial effects may remain; inspect repositories before retrying",
         )))?;
         if !output.status.success() {
-            // No retry, reset, abort or automatic conflict resolution. Avoid
-            // reflecting diagnostic output which may contain remote credentials.
+            // No retry, reset, abort or automatic conflict resolution. Retain
+            // diagnostics through the shared bounded credential filter.
             return Err(GitToolError::Git(format!(
-                "Native Pull failed ({}); fetched refs, conflicts or partial effects may remain; inspect repositories before retrying",
+                "Native Pull failed ({}); fetched refs, conflicts or partial effects may remain; inspect repositories before retrying\nstderr:\n{}\nstdout:\n{}",
                 output.status,
+                super::push_command::push_diagnostic(&output.stderr),
+                super::push_command::push_diagnostic(&output.stdout),
             )));
         }
         self.repository.revalidate_location().map_err(|error| GitToolError::Git(format!(

@@ -340,14 +340,12 @@ impl AddPlan {
     ) -> Result<Vec<u8>, GitToolError> {
         let output = self.run_command_output(command, deadline, limit).await?;
         if !output.status.success() {
-            let bytes = if output.stderr.is_empty() {
-                &output.stdout
-            } else {
-                &output.stderr
-            };
-            return Err(GitToolError::Git(
-                String::from_utf8_lossy(bytes).trim().to_owned(),
-            ));
+            return Err(GitToolError::Git(format!(
+                "Git command failed ({}); stderr:\n{}\nstdout:\n{}",
+                output.status,
+                push_command::push_diagnostic(&output.stderr),
+                push_command::push_diagnostic(&output.stdout),
+            )));
         }
         Ok(output.stdout)
     }
