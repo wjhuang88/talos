@@ -197,8 +197,8 @@ try {
                 }
             }
         }
-        Write-Fixture $homeCfg "[i324]n    profile = home"
-        Write-Fixture $homeXdgCfg "[i324]n    profile = fallback"
+        Write-Fixture $homeCfg "[i324]`n    profile = home"
+        Write-Fixture $homeXdgCfg "[i324]`n    profile = fallback"
         Write-Fixture $homeAttr 'i324-fixture.txt i324=fallback'
         # Each row compares actual old/new source consumption, and the newer
         # var output separately. Empty APPDATA files select a source even
@@ -214,9 +214,9 @@ try {
             @{Name='fallback-app-attr-only'; Xdg='value'; Config='missing'; Attr='value'; Fallback=$true}
         )
         foreach ($row in $rows) {
-            Set-MatrixFile $xdgCfg $row.Xdg "[i324]n    profile = xdg"
+            Set-MatrixFile $xdgCfg $row.Xdg "[i324]`n    profile = xdg"
             Set-MatrixFile $xdgAttr $row.Xdg 'i324-fixture.txt i324=xdg'
-            Set-MatrixFile $appCfg $row.Config "[i324]n    profile = app"
+            Set-MatrixFile $appCfg $row.Config "[i324]`n    profile = app"
             Set-MatrixFile $appAttr $row.Attr 'i324-fixture.txt i324=app'
             $envCase = $envBase.Clone()
             if ($row.Fallback) { $envCase['XDG_CONFIG_HOME'] = '' }
