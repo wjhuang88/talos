@@ -20,7 +20,7 @@ Refinement / Unclaimed。[任务、验收与 Required Reads](active/GIT-002-fetc
 
 ## 会话恢复分支后续任务
 
-[归并记录与验收表](../tasks/2026-11-11-session-recovery-handoff.md)列出五项后续工作。[内部治理检查权限](active/VALIDATION-004-internal-governance-read-admission.md)进入 Refinement；Windows 验收沿用 #923。
+[归并记录与验收表](../tasks/2026-11-11-session-recovery-handoff.md)列出五项后续工作。[内部治理检查权限](active/VALIDATION-004-internal-governance-read-admission.md)由 #1050 提议激活；Windows 验收沿用 #923。
 
 ## SEARCH-001-D2-T3 / I337 / #1015 — Complete / Closed
 
