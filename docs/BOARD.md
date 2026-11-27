@@ -1,3 +1,7 @@
+## PROVIDER-TEMPERATURE-001 / #1046 — Intake / Unclaimed
+
+[Owner](tasks/openai-chat-sampling-temperature.md) / [#1046](https://github.com/wjhuang88/talos/issues/1046): OpenAI Chat Completions sampling temperature; separate Codex claim #1047 remains proposed. Registration only, no implementation or activation.
+
 ## SEARCH-001-D2-T4 / I339 / #1039 — proposed bounded MCP execution
 
 [Owner](backlog/active/SEARCH-001-D2-T4-mcp-bounded-execution.md) / [I339](iterations/I339-search-mcp-bounded-execution.md) / [#1039](https://github.com/wjhuang88/talos/issues/1039): **Active / Claimed PROPOSED via #1040**; bounded MCP search execution, I337 terminal; no default admission or supplier calls. Claim and activation ineffective until #1040 merges.
