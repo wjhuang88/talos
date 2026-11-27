@@ -5,14 +5,18 @@ use std::path::Path;
 /// Whether the workspace has enough governance structure for agile discovery.
 /// This enables discovery only, not automatic invocation or mutation authority.
 pub fn agile_summary_available(workspace: &Path) -> bool {
-    workspace.join(".agent-governance/manifest.yaml").is_file()
+    let Ok(root) = cap_std::fs::Dir::open_ambient_dir(workspace, cap_std::ambient_authority())
+    else {
+        return false;
+    };
+    root.is_file(".agent-governance/manifest.yaml")
         || [
             "docs/BOARD.md",
             "docs/iterations/README.md",
             "docs/backlog/PRODUCT-BACKLOG.md",
         ]
         .iter()
-        .filter(|marker| workspace.join(marker).is_file())
+        .filter(|marker| root.is_file(marker))
         .count()
             >= 2
 }

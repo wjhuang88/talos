@@ -314,9 +314,11 @@ struct MarkerDetector {
 
 impl ProjectTypeDetector for MarkerDetector {
     fn detect(&self, workspace: &Path) -> Option<ProjectType> {
+        let root =
+            cap_std::fs::Dir::open_ambient_dir(workspace, cap_std::ambient_authority()).ok()?;
         self.markers
             .iter()
-            .any(|marker| workspace.join(marker).exists())
+            .any(|marker| root.metadata(marker).is_ok())
             .then_some(self.project_type)
     }
 

@@ -1,7 +1,12 @@
+use cap_std::fs::Dir;
 use std::path::Path;
 
 /// Render the supported read-only governance summary for the bound workspace.
 pub fn format_governance_summary(workspace: &Path) -> String {
+    let Ok(root) = Dir::open_ambient_dir(workspace, cap_std::ambient_authority()) else {
+        return "[System] Governance workspace unavailable".into();
+    };
+    let workspace = &root;
     let mut out = String::new();
     out.push_str("[System] Talos Governance Status\n");
     out.push_str("[System] ========================\n\n");
@@ -15,9 +20,9 @@ pub fn format_governance_summary(workspace: &Path) -> String {
     out
 }
 
-fn format_manifest(workspace: &Path, out: &mut String) {
-    let path = workspace.join(".agent-governance").join("manifest.yaml");
-    let Ok(content) = std::fs::read_to_string(&path) else {
+fn format_manifest(workspace: &Dir, out: &mut String) {
+    let path = Path::new(".agent-governance").join("manifest.yaml");
+    let Ok(content) = workspace.read_to_string(&path) else {
         out.push_str("[System] Manifest: not found\n\n");
         return;
     };
@@ -37,9 +42,9 @@ fn format_manifest(workspace: &Path, out: &mut String) {
     out.push('\n');
 }
 
-fn format_board(workspace: &Path, out: &mut String) {
-    let path = workspace.join("docs").join("BOARD.md");
-    let Ok(content) = std::fs::read_to_string(&path) else {
+fn format_board(workspace: &Dir, out: &mut String) {
+    let path = Path::new("docs").join("BOARD.md");
+    let Ok(content) = workspace.read_to_string(&path) else {
         out.push_str("[System] Board: not found\n\n");
         return;
     };
@@ -94,9 +99,9 @@ fn clean_cell(cell: &str) -> String {
         .to_string()
 }
 
-fn format_iterations(workspace: &Path, out: &mut String) {
-    let path = workspace.join("docs").join("iterations").join("README.md");
-    let Ok(content) = std::fs::read_to_string(&path) else {
+fn format_iterations(workspace: &Dir, out: &mut String) {
+    let path = Path::new("docs").join("iterations").join("README.md");
+    let Ok(content) = workspace.read_to_string(&path) else {
         out.push_str("[System] Iterations: not found\n\n");
         return;
     };
@@ -160,12 +165,9 @@ fn is_open_state(state: &str) -> bool {
     .any(|s| state.contains(s))
 }
 
-fn format_backlog(workspace: &Path, out: &mut String) {
-    let path = workspace
-        .join("docs")
-        .join("backlog")
-        .join("PRODUCT-BACKLOG.md");
-    let Ok(content) = std::fs::read_to_string(&path) else {
+fn format_backlog(workspace: &Dir, out: &mut String) {
+    let path = Path::new("docs").join("backlog").join("PRODUCT-BACKLOG.md");
+    let Ok(content) = workspace.read_to_string(&path) else {
         out.push_str("[System] Backlog: not found\n\n");
         return;
     };
@@ -220,8 +222,8 @@ fn count_backlog_active_items(content: &str) -> Vec<(String, String)> {
     items
 }
 
-fn format_validation(workspace: &Path, out: &mut String) {
-    let report = collect_governance_validation(workspace);
+fn format_validation(workspace: &Dir, out: &mut String) {
+    let report = validate_directory(workspace);
     out.push_str("[System] Validation\n");
     if report.errors == 0 {
         out.push_str(&format!(
@@ -284,9 +286,20 @@ impl GovernanceValidationReport {
 /// Validate Talos project governance using Rust-only, read-only checks.
 #[must_use]
 pub fn collect_governance_validation(workspace: &Path) -> GovernanceValidationReport {
+    match Dir::open_ambient_dir(workspace, cap_std::ambient_authority()) {
+        Ok(dir) => validate_directory(&dir),
+        Err(_) => {
+            let mut report = GovernanceValidationReport::new();
+            report.error("governance workspace unavailable");
+            report
+        }
+    }
+}
+
+fn validate_directory(workspace: &Dir) -> GovernanceValidationReport {
     let mut report = GovernanceValidationReport::new();
-    let manifest_path = workspace.join(".agent-governance").join("manifest.yaml");
-    let Ok(manifest) = std::fs::read_to_string(&manifest_path) else {
+    let manifest_path = Path::new(".agent-governance").join("manifest.yaml");
+    let Ok(manifest) = workspace.read_to_string(&manifest_path) else {
         report.error("missing .agent-governance/manifest.yaml");
         return report;
     };
@@ -377,9 +390,9 @@ fn clean_yaml_value(value: &str) -> String {
         .to_string()
 }
 
-fn validate_entrypoints(workspace: &Path, manifest: &str, report: &mut GovernanceValidationReport) {
+fn validate_entrypoints(workspace: &Dir, manifest: &str, report: &mut GovernanceValidationReport) {
     for (name, target) in section_pairs(manifest, "entrypoints") {
-        if !workspace.join(&target).exists() {
+        if !workspace.metadata(&target).is_ok() {
             report.error(format!(
                 "declared entrypoint does not exist: {name} -> {target}"
             ));
@@ -388,7 +401,7 @@ fn validate_entrypoints(workspace: &Path, manifest: &str, report: &mut Governanc
 }
 
 fn validate_product_profile(
-    workspace: &Path,
+    workspace: &Dir,
     manifest: &str,
     product_like: bool,
     status: Option<&str>,
@@ -432,13 +445,13 @@ fn validate_product_profile(
 }
 
 fn check_status_sensitive_file(
-    workspace: &Path,
+    workspace: &Dir,
     relative_path: &str,
     message: &str,
     status: Option<&str>,
     report: &mut GovernanceValidationReport,
 ) {
-    if workspace.join(relative_path).is_file() {
+    if workspace.is_file(relative_path) {
         return;
     }
     if status == Some("conformant") {
@@ -449,7 +462,7 @@ fn check_status_sensitive_file(
 }
 
 fn validate_iteration_records(
-    workspace: &Path,
+    workspace: &Dir,
     manifest: &str,
     report: &mut GovernanceValidationReport,
 ) {
@@ -461,15 +474,11 @@ fn validate_iteration_records(
     }
 
     for record in records {
-        let Ok(content) = std::fs::read_to_string(&record) else {
+        let Ok(content) = workspace.read_to_string(&record) else {
             continue;
         };
         if claims_completion(&content) && !shows_evidence(&content) {
-            let relative = record
-                .strip_prefix(workspace)
-                .ok()
-                .and_then(|p| p.to_str())
-                .unwrap_or_else(|| record.to_str().unwrap_or("<invalid path>"));
+            let relative = record.to_str().unwrap_or("<invalid path>");
             report.warn(format!(
                 "iteration claims completion but records no validation evidence: {}",
                 relative.trim_start_matches('/')
@@ -478,14 +487,14 @@ fn validate_iteration_records(
     }
 }
 
-fn iteration_record_paths(workspace: &Path) -> Vec<std::path::PathBuf> {
-    let dir = workspace.join("docs").join("iterations");
-    let Ok(entries) = std::fs::read_dir(dir) else {
+fn iteration_record_paths(workspace: &Dir) -> Vec<std::path::PathBuf> {
+    let dir = Path::new("docs").join("iterations");
+    let Ok(entries) = workspace.read_dir(&dir) else {
         return Vec::new();
     };
     entries
         .filter_map(Result::ok)
-        .map(|entry| entry.path())
+        .map(|entry| dir.join(entry.file_name()))
         .filter(|path| {
             path.extension().and_then(|ext| ext.to_str()) == Some("md")
                 && !matches!(
@@ -526,9 +535,9 @@ fn shows_evidence(content: &str) -> bool {
         .any(|word| lower.contains(word))
 }
 
-fn validate_board(workspace: &Path, report: &mut GovernanceValidationReport) {
-    let path = workspace.join("docs").join("BOARD.md");
-    let Ok(content) = std::fs::read_to_string(&path) else {
+fn validate_board(workspace: &Dir, report: &mut GovernanceValidationReport) {
+    let path = Path::new("docs").join("BOARD.md");
+    let Ok(content) = workspace.read_to_string(&path) else {
         return;
     };
     let lower = content.to_ascii_lowercase();
@@ -547,7 +556,7 @@ fn validate_board(workspace: &Path, report: &mut GovernanceValidationReport) {
 }
 
 fn validate_capability_files(
-    workspace: &Path,
+    workspace: &Dir,
     manifest: &str,
     report: &mut GovernanceValidationReport,
 ) {
@@ -577,7 +586,7 @@ fn validate_capability_files(
     ] {
         if capability_value(manifest, capability).as_deref() == Some("conformant") {
             for relative in required {
-                if !workspace.join(relative).exists() {
+                if !workspace.metadata(relative).is_ok() {
                     report.error(format!(
                         "{capability} is conformant but required file is missing: {relative}"
                     ));
@@ -595,7 +604,7 @@ fn validate_capability_files(
 }
 
 fn validate_policy_text(
-    workspace: &Path,
+    workspace: &Dir,
     manifest: &str,
     product_like: bool,
     report: &mut GovernanceValidationReport,
@@ -691,8 +700,9 @@ fn validate_policy_text(
     }
 }
 
-fn file_contains(workspace: &Path, relative_path: &str, text: &str) -> bool {
-    std::fs::read_to_string(workspace.join(relative_path))
+fn file_contains(workspace: &Dir, relative_path: &str, text: &str) -> bool {
+    workspace
+        .read_to_string(relative_path)
         .map(|content| content.contains(text))
         .unwrap_or(false)
 }
@@ -700,6 +710,23 @@ fn file_contains(workspace: &Path, relative_path: &str, text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn external_manifest_is_unavailable_to_summary_and_validation() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let outside = tempfile::tempdir().expect("external directory");
+        std::fs::write(
+            outside.path().join("manifest.yaml"),
+            "profile: external-sentinel",
+        )
+        .expect("test workspace fixture");
+        std::os::unix::fs::symlink(outside.path(), workspace.path().join(".agent-governance"))
+            .expect("test workspace fixture");
+        assert!(!crate::agile_summary_available(workspace.path()));
+        assert!(collect_governance_validation(workspace.path()).errors > 0);
+        assert!(!format_governance_summary(workspace.path()).contains("external-sentinel"));
+    }
 
     #[test]
     fn empty_workspace_does_not_panic() {
@@ -778,7 +805,11 @@ mod tests {
     fn validation_section_reports_missing_manifest() {
         let dir = tempfile::tempdir().expect("operation should succeed");
         let mut out = String::new();
-        format_validation(dir.path(), &mut out);
+        format_validation(
+            &Dir::open_ambient_dir(dir.path(), cap_std::ambient_authority())
+                .expect("test workspace fixture"),
+            &mut out,
+        );
         assert!(out.contains("Status: FAIL"));
         assert!(out.contains("missing .agent-governance/manifest.yaml"));
     }
@@ -795,7 +826,11 @@ mod tests {
         .expect("operation should succeed");
 
         let mut out = String::new();
-        format_validation(dir.path(), &mut out);
+        format_validation(
+            &Dir::open_ambient_dir(dir.path(), cap_std::ambient_authority())
+                .expect("test workspace fixture"),
+            &mut out,
+        );
 
         assert!(out.contains("Status: PASS"));
         assert!(out.contains("OK: .agent-governance/manifest.yaml found"));
