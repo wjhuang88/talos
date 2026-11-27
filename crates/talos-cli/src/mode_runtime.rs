@@ -241,6 +241,10 @@ pub(crate) fn apply_session_model_to_config(
         }
         LatestSessionModelInfo::Legacy { model, provider } => (model, provider, None),
     };
+    // A new session can have a runtime identity before a model is selected.
+    if model.is_empty() && config.model.is_empty() && provider == config.provider {
+        return Ok(());
+    }
     let model_ref = if provider.is_empty() || model.starts_with(&format!("{provider}/")) {
         model
     } else {
