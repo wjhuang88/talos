@@ -186,6 +186,48 @@ pub(crate) fn ensure_session_runtime_identity(
         .map_err(|error| anyhow!("failed to initialize Session runtime identity: {error}"))
 }
 
+/// Apply startup selection while holding the Session runtime lease.
+/// Existing pending activations must be reconciled before changing identity.
+pub(crate) fn prepare_resumed_model(
+    config: &mut Config,
+    session: &talos_session::Session,
+    explicit_selection: bool,
+) -> Result<()> {
+    reconcile_session_runtime_state(session)?;
+    if !explicit_selection || config.model.is_empty() {
+        apply_session_model_to_config(config, session);
+    }
+    if config.model.is_empty() {
+        return Ok(());
+    }
+    let target =
+        SessionRuntimeIdentity::new(&config.provider, &config.model, config.variant.as_deref());
+    let store = PendingSubmissionStore::for_session(session);
+    if let Some(state) = store.runtime_state()? {
+        if state.activation.target != target {
+            let generation = state
+                .activation
+                .generation
+                .checked_add(1)
+                .ok_or_else(|| anyhow!("runtime generation exhausted"))?;
+            let activation = talos_session::SessionRuntimeActivation::new(
+                generation,
+                state.activation.target,
+                target,
+            );
+            store.stage_runtime_activation(state.activation.generation, &activation)?;
+            session.append_with_metadata(
+                &crate::model_lifecycle::model_switch_marker_for_activation(&activation),
+                session_model_activation_metadata(&activation)?,
+            )?;
+            store.commit_runtime_activation(&activation.activation_id)?;
+        }
+    } else {
+        ensure_session_runtime_identity(config, session)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
     let Some(model_info) = latest_session_model_info(session) else {
         return;

@@ -670,7 +670,7 @@ fn model_switch_markers_match(left: &Message, right: &Message) -> bool {
     )
 }
 
-fn model_switch_marker_for_activation(activation: &SessionModelActivation) -> Message {
+pub(crate) fn model_switch_marker_for_activation(activation: &SessionModelActivation) -> Message {
     Message::System {
         content: format!(
             "[System] Model switch activation {}: {} -> {}.\n[System] Active model for subsequent requests: {}.",
