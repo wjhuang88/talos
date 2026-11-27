@@ -28,3 +28,52 @@ A final fetch observed another actor force-updating `origin/test/i334-e3a-memory
 ## Resume
 
 Review remaining branches against owner documents and live PR status. For squash/rebase histories, compare actual behavior and required acceptance, not ancestry alone. Merge only reviewed, needed changes with applicable governance/security checks. Preserve archives with recovery purpose. This checkpoint records partial cleanup, not completion of the overall branch audit.
+
+## Local disposition at 1c80425b
+
+Removed the local storage and PR #917 intermediate branch names after verifying
+the ancestor chain 1f5602eb → 0b8ccbe4 → 6483241c. The last commit is retained
+by backup/recovery-keep0-validation-6483241c. The earlier custody backup was
+retired after patch comparison with #953. The #1045 branch was retired locally
+and on origin after merge.
+
+Retired Windows diagnostics stash 622a573e. Its CLI fixture, session dependency
+and durable implementation match the #966 merge. The index had no staged delta
+and the stash had no untracked parent. The recovery owner records the later
+preflight and the #962 fixture integration.
+
+Retain integrated candidate ff068667 for comparison with the recovery and UI
+owners. They link combined candidates 0e0ee5d3, ceb86be4 and ff068667 to their
+standalone validations. Keep the remaining recovery assertions with the recovery
+owner. The November 11 handoff lists the approval, diagnostics and edit-preview
+acceptance items that can be exercised on main.
+
+The active local stashes are 12d2c1a0 (combined handoff), 851b86f0 (recovery)
+and cf940fc8 (performance evidence for #923). Of the 66 untracked performance
+files, 54 match main at the same path, eight paths are absent and four differ.
+Eleven older rebase snapshots remain under refs/archive/stash-review on this
+host for their distinct file versions. These local refs preserve original data
+while the existing task owners track outstanding acceptance.
+
+## Mainline reconciliation at 1c80425b
+
+The seven recovery patches with differing patch IDs have corresponding mainline
+implementations, in candidate order: 8f163abc, 23c8a118, 715d0198, a1a0a210,
+29e8d58b, 63d195e2, and 0f8cff08. Comparing the touched Rust files at each
+pair leaves only the independent storage_contracts exports and workspace path
+display changes. Replaying the recovery series would carry older versions of
+these files into the current implementation.
+
+The integrated handoff's approval fixture was reconciled by #962. Main carries
+the query-bound implementation in 56ceeef1, source access and retry handling
+in 15bdc03f, user history spacing in 405ce9da and subsequent tests, and watcher
+fixture isolation in 8bcb7b47. The watcher file matches the integrated tip
+byte for byte. Main includes all three named user-separator regressions from
+6aa91f46.
+
+All 54 same-path identical untracked performance files include the original
+sample archives. The eight missing paths are generated Python bytecode. The
+four differing files are the tracker, native acceptance note, comparison script
+and its tests. Main retains the native note in history and updates the tracker
+through #960. The current comparison script and tests add mixed-deadline
+handling. Windows terminal acceptance continues under #923.
