@@ -8,7 +8,7 @@
 
 ## GIT-FEATURE-001 / #1041 — standalone Git feature regression
 
-[Owner](active/GIT-FEATURE-001-standalone-ignore-dependency.md): Intake / Unclaimed. Restore existing optional ignore dependency in git feature; isolated/native CI and independent review before main integration. Separate from GIT-002 and I338.
+[Owner](active/GIT-FEATURE-001-standalone-ignore-dependency.md): Partial / Unclaimed. The standalone Git feature fix landed via #1045 at `1c80425b`. Native gate evidence and the #1034 integration check remain open.
 
 ## MCP-002 / #1033 — supervised stdio MCP cleanup (intake only)
 

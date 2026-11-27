@@ -6,9 +6,9 @@
 
 [Owner](backlog/active/SEARCH-001-D2-T4-mcp-bounded-execution.md) / [I339](iterations/I339-search-mcp-bounded-execution.md) / [#1039](https://github.com/wjhuang88/talos/issues/1039): **Active / Claimed PROPOSED via #1040**; bounded MCP search execution, I337 terminal; no default admission or supplier calls. Claim and activation ineffective until #1040 merges.
 
-## GIT-FEATURE-001 / #1041 — standalone Git feature regression intake
+## GIT-FEATURE-001 / #1041 — standalone Git feature regression
 
-[Owner](backlog/active/GIT-FEATURE-001-standalone-ignore-dependency.md) / [#1041](https://github.com/wjhuang88/talos/issues/1041): Intake / Unclaimed. Missing existing ignore feature edge blocks native Git and STORE-002 E checks, and #1034. No implementation authorized; independent main correction required.
+[Owner](backlog/active/GIT-FEATURE-001-standalone-ignore-dependency.md) / [#1041](https://github.com/wjhuang88/talos/issues/1041): Partial / Unclaimed. The standalone Git feature fix landed via #1045 at `1c80425b`. Native gate evidence and the #1034 integration check remain open.
 
 ## MCP-002 / #1033 — stdio MCP process supervision intake
 
