@@ -18,9 +18,9 @@ Refinement / Unclaimed; implementation not started. [Owner and acceptance](backl
 
 Complete / Closed. Desktop shell approval and execution resolve the same workspace. Implementation commit `4462a35b` merged in #990. [Task and acceptance](tasks/desktop-relative-workspace-approval.md)
 
-## SEARCH-001-D2-T3 / I337 — proposed offline MCP evidence harness
+## SEARCH-001-D2-T3 / I337 — Complete / Closed
 
-[Owner](backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](iterations/I337-search-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): In Progress / Claimed PROPOSED via [#1016](https://github.com/wjhuang88/talos/pull/1016), ineffective until merge. Offline-only synthetic search protocol/replay, no external vendor calls, default routing or new provider. I331 documentary slice remains closed; #848/#624 stay open for admission and real-region evidence.
+[Owner](backlog/active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](iterations/I337-search-mcp-offline-observation.md) / [#1015](https://github.com/wjhuang88/talos/issues/1015): Complete / Closed upon owner-first publication; [source #1018](https://github.com/wjhuang88/talos/pull/1018), completion commit `9eddf0c5703d77f89bd754c5bf22c5b26bc84a6f`; exact-head CI 8/8 and independent review recommends approval with no open issues. Offline-only synthetic search protocol/replay; #848/#624 remain open and neither provider is admitted.
 
 ## GIT-ENV-001 / #1004 — Scoop Git environment admission
 

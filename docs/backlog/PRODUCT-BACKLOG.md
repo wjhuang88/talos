@@ -10,9 +10,9 @@ Refinement / Unclaimed。[任务、验收与 Required Reads](active/GIT-002-fetc
 
 [归并记录与验收表](../tasks/2026-11-11-session-recovery-handoff.md)列出五项后续工作。[内部治理检查权限](active/VALIDATION-004-internal-governance-read-admission.md)进入 Refinement；Windows 验收沿用 #923。
 
-## SEARCH-001-D2-T3 / I337 / #1015 — proposed offline MCP evidence harness
+## SEARCH-001-D2-T3 / I337 / #1015 — Complete / Closed
 
-[Owner](active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](../iterations/I337-search-mcp-offline-observation.md): In Progress / Claimed PROPOSED #1016, only effective on merge. Offline synthetic Exa/Parallel search protocol fixtures, bounded replay metadata and negative tests; no vendor access, default activation or rights claim. Parent #848/#624 remain Open; I331 closed.
+[Owner](active/SEARCH-001-D2-T3-mcp-offline-observation.md) / [I337](../iterations/I337-search-mcp-offline-observation.md): Complete / Closed upon owner-first publication. [Source #1018](https://github.com/wjhuang88/talos/pull/1018) merged as `9eddf0c5703d77f89bd754c5bf22c5b26bc84a6f`, exact-head CI 8/8 and independent review recommends approval. Offline synthetic fixtures and bounded replay only; #848/#624 Open, no vendor access, default activation or rights claim.
 
 ## GIT-ENV-001 / #1004 — Scoop Git environment admission
 
