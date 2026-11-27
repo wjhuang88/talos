@@ -14,7 +14,7 @@
 | Work Slice | Internal governance validation permission classification |
 | Claimed At | Not applicable |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
