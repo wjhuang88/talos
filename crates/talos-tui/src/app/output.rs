@@ -950,8 +950,10 @@ impl Tui {
 
     pub(super) fn advance_processing_frame(&mut self) {
         self.release_deferred_reconnecting_status(Instant::now());
-        self.processing_frame =
-            next_processing_frame(self.state.status.is_processing, self.processing_frame);
+        self.processing_frame = next_processing_frame(
+            self.state.status.is_processing || self.state.compaction_pending,
+            self.processing_frame,
+        );
         let Some(selection) = self.selection else {
             return;
         };
