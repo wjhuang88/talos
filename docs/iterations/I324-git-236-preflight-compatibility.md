@@ -172,3 +172,43 @@ observed package DLLs. No extracted Git execution or repeated config probes.
 New-head CI and re-review pending. This compares static declared names only,
 not the ordinary/delay split independently or transitive/dynamic loader
 resolution; never infer complete pre-spawn attestation from it.
+
+
+## 2026-11-26 D2 supplied-image graph checkpoint
+
+[#1027](https://github.com/wjhuang88/talos/pull/1027) merged as
+`b0b262cd32b89345d8d44fdf1179dd47e5ce8613`: exact-head CI #4647
+8/8, 10 synthetic parser tests, 8 pinned-image DUMPBIN comparisons,
+Windows talos-tools 1167 passed/1 ignored, both governance validators and
+independent candidate-only review. See [merge receipt](https://github.com/wjhuang88/talos/issues/919#issuecomment-7167796280).
+No production authority granted.
+
+Next test-only candidate: iteratively traverse declared ordinary/delay import
+edges from an explicit root byte slice through a supplied canonical DLL-label
+catalog. Reject duplicate labels, unsupported labels, malformed reachable
+images, and aggregate image/byte/edge budget overruns. Preserve cycles, shared
+dependencies, per-node import kinds, and the unresolved-name set; a catalog
+match is not a path or mapped-image identity. Unreachable supplied images are
+counted toward the input budget but not parsed. Limits: 32 total image
+labels, 128 MiB supplied bytes, 2048 distinct per-node/kind edges, plus
+existing per-image bounds. No filesystem/environment/process access by the
+graph itself, no new dependency or production call site.
+
+The existing pinned Windows oracle now also supplies the PortableGit actual
+rebound git.exe and its five observed sibling package DLLs to the graph.
+Expected six reachable images and six unresolved names (advapi32.dll,
+kernel32.dll, msvcrt.dll, ntdll.dll, user32.dll, ws2_32.dll) are derived from
+the prior exact-image differential; new execution must confirm. Those names
+are **unresolved**, not trusted OS images or proof of absence. The fixture
+adapter reads only the six fixed extracted paths, no installed Git or ambient
+DLL search. No selected package executable is run. The prior MinGit missing
+rebound-image observation remains unsupported, not a substitute route.
+
+Remaining D2 blocker: actual trusted pre-spawn resolution (including OS
+KnownDLLs/API-set/SxS/redirection/forwarders and dynamic loads, search order,
+exact admitted file/absence/ancestor identity and race prevention) is not
+demonstrated by this graph. Neither empty unresolved names nor matching
+supplied labels may authorize the five compatibility replacements. Keep
+existing supported CLI and ADR-089 authority; native original-environment
+17 MiB Checkout/Commit, independent security review and maintainer
+acceptance remain required. #919 stays Open.

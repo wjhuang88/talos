@@ -1,9 +1,9 @@
 //! I324 D2 candidate: enumerate declared PE32+ DLL names from supplied bytes.
-//! This is not a Windows loader, a dependency closure, or an attestation.
+//! A supplied-image graph records declared edges, not a Windows loader closure or attestation.
 //! The parser uses no filesystem, environment, process, unsafe code or authority.
 //! The ignored package-fixture adapter reads only its explicit test input.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_IMAGE: usize = 64 * 1024 * 1024;
 const MAX_SECTIONS: usize = 96;
@@ -533,4 +533,266 @@ fn pe_import_frontier_fixture_from_file() {
     for name in imports.delayed {
         println!("I324_PE_DECLARED kind=delayed name={name}");
     }
+}
+
+const MAX_GRAPH_IMAGES: usize = 32;
+const MAX_GRAPH_BYTES: usize = 128 * 1024 * 1024;
+const MAX_GRAPH_EDGES: usize = 2048;
+
+#[derive(Debug, PartialEq, Eq)]
+struct ImportGraph {
+    // A root and reachable supplied images only. Each node retains the
+    // ordinary/delay distinction. Keys are labels, not load identities.
+    nodes: BTreeMap<String, DeclaredImports>,
+    // Missing from this supplied catalog, not absent from the host.
+    unresolved: BTreeSet<String>,
+}
+
+// Candidate-only: exact caller-supplied labels and bytes, never name-to-path
+// resolution. A catalog match does not establish what Windows would load.
+fn declared_graph(
+    root: &[u8],
+    supplied: &[(&str, &[u8])],
+    byte_budget: usize,
+    edge_budget: usize,
+) -> Result<ImportGraph> {
+    if supplied.len() >= MAX_GRAPH_IMAGES {
+        return Err(PeError::Budget);
+    }
+    let mut total_bytes = root.len();
+    let mut catalog = BTreeMap::from([("git.exe", root)]);
+    for &(name, bytes) in supplied {
+        if name.len() <= 4
+            || name.len() > MAX_NAME
+            || !name.ends_with(".dll")
+            || name.starts_with('.')
+            || name.contains("..")
+            || !name.bytes().all(|byte| {
+                byte.is_ascii_lowercase()
+                    || byte.is_ascii_digit()
+                    || matches!(byte, b'-' | b'_' | b'.')
+            })
+        {
+            return Err(PeError::Unsupported);
+        }
+        if catalog.insert(name, bytes).is_some() {
+            return Err(PeError::Malformed);
+        }
+        total_bytes = total_bytes
+            .checked_add(bytes.len())
+            .ok_or(PeError::Budget)?;
+        if bytes.len() > MAX_IMAGE {
+            return Err(PeError::Budget);
+        }
+    }
+    if root.len() > MAX_IMAGE || total_bytes > byte_budget.min(MAX_GRAPH_BYTES) {
+        return Err(PeError::Budget);
+    }
+
+    let mut nodes = BTreeMap::new();
+    let mut unresolved = BTreeSet::new();
+    let mut pending = BTreeSet::from(["git.exe".to_owned()]);
+    let mut edges = 0;
+    while let Some(label) = pending.pop_first() {
+        if nodes.contains_key(&label) {
+            continue;
+        }
+        let bytes = catalog.get(label.as_str()).ok_or(PeError::Malformed)?;
+        let imports = declared_imports(bytes)?;
+        edges += imports.ordinary.len() + imports.delayed.len();
+        if edges > edge_budget.min(MAX_GRAPH_EDGES) {
+            return Err(PeError::Budget);
+        }
+        for name in imports.ordinary.iter().chain(&imports.delayed) {
+            if catalog.contains_key(name.as_str()) {
+                if !nodes.contains_key(name) {
+                    pending.insert(name.clone());
+                }
+            } else {
+                unresolved.insert(name.clone());
+            }
+        }
+        nodes.insert(label, imports);
+    }
+    Ok(ImportGraph { nodes, unresolved })
+}
+
+fn graph_fixture(ordinary: Option<&str>, delayed: Option<&str>) -> Vec<u8> {
+    let mut bytes = fixture();
+    bytes[0x300..0x380].fill(0);
+    for (name, raw, dir) in [(ordinary, 0x300, 120), (delayed, 0x320, 216)] {
+        if let Some(name) = name {
+            bytes[raw..raw + name.len()].copy_from_slice(name.as_bytes());
+        } else {
+            put32(&mut bytes, 0x98 + dir, 0);
+            put32(&mut bytes, 0x98 + dir + 4, 0);
+        }
+    }
+    bytes
+}
+
+#[test]
+fn pe_graph_preserves_cycles_shared_edges_and_unresolved_names() {
+    let root = graph_fixture(Some("alpha.dll"), Some("beta.dll"));
+    let alpha = graph_fixture(Some("beta.dll"), Some("kernel32.dll"));
+    let beta = graph_fixture(Some("alpha.dll"), Some("kernel32.dll"));
+    let supplied: &[(&str, &[u8])] = &[
+        ("alpha.dll", &alpha),
+        ("beta.dll", &beta),
+        ("unused.dll", b"not a reachable image"),
+    ];
+    let graph = declared_graph(&root, supplied, MAX_GRAPH_BYTES, MAX_GRAPH_EDGES)
+        .expect("bounded declared graph");
+    assert_eq!(graph.nodes.len(), 3);
+    assert_eq!(graph.unresolved, BTreeSet::from(["kernel32.dll".into()]));
+    assert_eq!(
+        graph.nodes["git.exe"].ordinary,
+        BTreeSet::from(["alpha.dll".into()])
+    );
+    assert_eq!(
+        graph.nodes["git.exe"].delayed,
+        BTreeSet::from(["beta.dll".into()])
+    );
+    assert_eq!(
+        graph.nodes["alpha.dll"].ordinary,
+        BTreeSet::from(["beta.dll".into()])
+    );
+    assert_eq!(
+        graph.nodes["beta.dll"].ordinary,
+        BTreeSet::from(["alpha.dll".into()])
+    );
+    for name in ["alpha.dll", "beta.dll"] {
+        assert_eq!(
+            graph.nodes[name].delayed,
+            BTreeSet::from(["kernel32.dll".into()])
+        );
+    }
+}
+
+#[test]
+fn pe_graph_rejects_ambiguous_catalog_and_malformed_reachable_image() {
+    let root = graph_fixture(Some("alpha.dll"), None);
+    let alpha = graph_fixture(None, None);
+    for name in ["ALPHA.dll", "../alpha.dll", "alpha.exe"] {
+        assert_eq!(
+            declared_graph(&root, &[(name, &alpha)], MAX_GRAPH_BYTES, MAX_GRAPH_EDGES),
+            Err(PeError::Unsupported)
+        );
+    }
+    assert_eq!(
+        declared_graph(
+            &root,
+            &[("alpha.dll", &alpha), ("alpha.dll", &alpha)],
+            MAX_GRAPH_BYTES,
+            MAX_GRAPH_EDGES,
+        ),
+        Err(PeError::Malformed)
+    );
+    assert_eq!(
+        declared_graph(
+            &root,
+            &[("alpha.dll", b"invalid PE")],
+            MAX_GRAPH_BYTES,
+            MAX_GRAPH_EDGES,
+        ),
+        Err(PeError::Unsupported)
+    );
+    let graph = declared_graph(&root, &[], MAX_GRAPH_BYTES, MAX_GRAPH_EDGES)
+        .expect("missing catalog entries remain unresolved");
+    assert_eq!(graph.unresolved, BTreeSet::from(["alpha.dll".into()]));
+    assert_eq!(graph.nodes.len(), 1);
+}
+
+#[test]
+fn pe_graph_enforces_aggregate_budgets_before_returning_evidence() {
+    let root = graph_fixture(Some("alpha.dll"), Some("beta.dll"));
+    let leaf = graph_fixture(None, None);
+    assert_eq!(
+        declared_graph(
+            &root,
+            &[("unused.dll", &leaf)],
+            root.len() + leaf.len() - 1,
+            MAX_GRAPH_EDGES,
+        ),
+        Err(PeError::Budget)
+    );
+    assert_eq!(
+        declared_graph(&root, &[], MAX_GRAPH_BYTES, 1),
+        Err(PeError::Budget)
+    );
+    let names: Vec<_> = (0..MAX_GRAPH_IMAGES)
+        .map(|index| format!("leaf{index}.dll"))
+        .collect();
+    let supplied: Vec<_> = names
+        .iter()
+        .map(|name| (name.as_str(), leaf.as_slice()))
+        .collect();
+    assert_eq!(
+        declared_graph(&root, &supplied, MAX_GRAPH_BYTES, MAX_GRAPH_EDGES),
+        Err(PeError::Budget)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "explicit checksum-verified disposable PortableGit fixture only"]
+fn pe_graph_pinned_portablegit_rebound() {
+    use std::io::Read;
+    use std::path::PathBuf;
+
+    let root = PathBuf::from(
+        std::env::var_os("TALOS_I324_PE_GRAPH_ROOT").expect("explicit extracted fixture directory"),
+    );
+    let mut remaining = MAX_GRAPH_BYTES;
+    let mut read_image = |name: &str| {
+        let file = std::fs::File::open(root.join(name)).expect("explicit fixture image");
+        let limit = MAX_IMAGE.min(remaining);
+        let mut bytes = Vec::new();
+        file.take(limit as u64 + 1)
+            .read_to_end(&mut bytes)
+            .expect("bounded fixture read");
+        assert!(bytes.len() <= limit);
+        remaining -= bytes.len();
+        bytes
+    };
+    let writer = read_image("git.exe");
+    let names = [
+        "libpcre2-8-0.dll",
+        "libintl-8.dll",
+        "libiconv-2.dll",
+        "libssp-0.dll",
+        "zlib1.dll",
+    ];
+    let images: Vec<_> = names.iter().map(|name| read_image(name)).collect();
+    let supplied: Vec<_> = names
+        .iter()
+        .zip(&images)
+        .map(|(&name, bytes)| (name, bytes.as_slice()))
+        .collect();
+    let graph = declared_graph(&writer, &supplied, MAX_GRAPH_BYTES, MAX_GRAPH_EDGES)
+        .expect("pinned supplied-image graph");
+    assert_eq!(graph.nodes.len(), 6);
+    assert_eq!(
+        graph.unresolved,
+        BTreeSet::from([
+            "advapi32.dll".into(),
+            "kernel32.dll".into(),
+            "msvcrt.dll".into(),
+            "ntdll.dll".into(),
+            "user32.dll".into(),
+            "ws2_32.dll".into(),
+        ])
+    );
+    for (image, imports) in &graph.nodes {
+        for name in &imports.ordinary {
+            println!("I324_PE_GRAPH_EDGE image={image} kind=ordinary name={name}");
+        }
+        for name in &imports.delayed {
+            println!("I324_PE_GRAPH_EDGE image={image} kind=delayed name={name}");
+        }
+    }
+    for name in &graph.unresolved {
+        println!("I324_PE_GRAPH_UNRESOLVED name={name}");
+    }
+    println!("I324_PE_GRAPH nodes=6 unresolved=6 static_only=true");
 }
