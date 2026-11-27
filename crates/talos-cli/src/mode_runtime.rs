@@ -195,7 +195,7 @@ pub(crate) fn prepare_resumed_model(
 ) -> Result<()> {
     reconcile_session_runtime_state(session)?;
     if !explicit_selection || config.model.is_empty() {
-        apply_session_model_to_config(config, session);
+        apply_session_model_to_config(config, session)?;
     }
     if config.model.is_empty() {
         return Ok(());
@@ -228,9 +228,12 @@ pub(crate) fn prepare_resumed_model(
     Ok(())
 }
 
-pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
+pub(crate) fn apply_session_model_to_config(
+    config: &mut Config,
+    session: &talos_session::Session,
+) -> Result<()> {
     let Some(model_info) = latest_session_model_info(session) else {
-        return;
+        return Ok(());
     };
     let (model, provider, exact_variant) = match model_info {
         LatestSessionModelInfo::Activation(identity) => {
@@ -243,17 +246,13 @@ pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos
     } else {
         format!("{provider}/{model}")
     };
-    if let Err(e) = config.set_active_model(&model_ref) {
-        tracing::warn!(
-            session_id = %session.id,
-            model = %model_ref,
-            "failed to restore session model metadata: {e}"
-        );
-        return;
-    }
+    config
+        .set_active_model(&model_ref)
+        .map_err(|error| anyhow!("cannot restore saved model {model_ref}: {error}"))?;
     if let Some(variant) = exact_variant {
         crate::model_lifecycle::apply_variant_change(config, variant.as_deref());
     }
+    Ok(())
 }
 
 pub(crate) fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
@@ -870,7 +869,8 @@ mod tests {
             .set_active_model("openai/o3")
             .expect("builtin openai/o3 model");
         crate::model_lifecycle::apply_variant_change(&mut restarted_global, Some("low-reasoning"));
-        apply_session_model_to_config(&mut restarted_global, &session);
+        apply_session_model_to_config(&mut restarted_global, &session)
+            .expect("restore saved identity");
 
         assert_eq!(restarted_global.variant.as_deref(), Some("high-reasoning"));
         assert_eq!(
@@ -897,7 +897,7 @@ mod tests {
 
         let mut later_global = initial.clone();
         crate::model_lifecycle::apply_variant_change(&mut later_global, Some("low-reasoning"));
-        apply_session_model_to_config(&mut later_global, &session);
+        apply_session_model_to_config(&mut later_global, &session).expect("restore saved identity");
 
         assert_eq!(later_global.variant.as_deref(), Some("high-reasoning"));
         assert_eq!(
@@ -970,7 +970,7 @@ mod tests {
             variant: Some("low-reasoning".into()),
             ..Default::default()
         };
-        apply_session_model_to_config(&mut config, &session);
+        apply_session_model_to_config(&mut config, &session).expect("restore saved identity");
 
         assert_eq!(config.provider, "openai");
         assert_eq!(config.model, "o3");
@@ -994,7 +994,7 @@ mod tests {
             variant: Some("high-reasoning".into()),
             ..Default::default()
         };
-        apply_session_model_to_config(&mut config, &session);
+        apply_session_model_to_config(&mut config, &session).expect("restore saved identity");
 
         assert_eq!(config.provider, "openai");
         assert_eq!(config.model, "gpt-4o");
@@ -1013,7 +1013,7 @@ mod tests {
         append_activation(&session, &activation);
 
         let mut config = Config::default();
-        apply_session_model_to_config(&mut config, &session);
+        apply_session_model_to_config(&mut config, &session).expect("restore saved identity");
         assert_eq!(config.variant.as_deref(), Some("deleted-variant"));
 
         let (_, resolution) = crate::model_lifecycle::materialize_runtime_model_config(&config);

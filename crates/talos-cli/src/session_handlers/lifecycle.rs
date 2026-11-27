@@ -470,9 +470,11 @@ pub(crate) async fn handle_session_resume(
         return None;
     }
     let mut resume_config = config.clone();
-    apply_session_model_to_config(&mut resume_config, &target_session);
+
     if let Err(error) =
-        crate::mode_runtime::ensure_session_runtime_identity(&resume_config, &target_session)
+        apply_session_model_to_config(&mut resume_config, &target_session).and_then(|()| {
+            crate::mode_runtime::ensure_session_runtime_identity(&resume_config, &target_session)
+        })
     {
         let text =
             format!("[Error] Failed to establish resumed Session runtime identity: {error}\n");
@@ -854,11 +856,13 @@ pub(crate) async fn handle_session_fork(
     }
 
     let mut fork_config = config.clone();
-    apply_session_model_to_config(&mut fork_config, &child_session);
+
     // Receipt absence means no inherited identity, not an unrecorded activation.
     // Persist the effective host selection before constructing the child runtime.
     if let Err(error) =
-        crate::mode_runtime::ensure_session_runtime_identity(&fork_config, &child_session)
+        apply_session_model_to_config(&mut fork_config, &child_session).and_then(|()| {
+            crate::mode_runtime::ensure_session_runtime_identity(&fork_config, &child_session)
+        })
     {
         let text = fork_failure_message(
             &mut staged_history,
