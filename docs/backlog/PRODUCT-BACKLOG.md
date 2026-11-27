@@ -18,9 +18,9 @@ Refinement / Unclaimed。[任务、验收与 Required Reads](active/GIT-002-fetc
 
 Complete / Closed via #1007, f4eb947c. [Story, acceptance and required reads](active/GIT-ENV-001-scoop-install-root.md).
 
-## SEARCH-001-D3-T5 / I335 / #1001 — Complete / Closed upon owner-first closeout (bounded opt-in)
+## SEARCH-001-D3-T5 / I335 / #1001 — Complete / Closed (bounded opt-in)
 
-[Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): claim #1002 merged before [implementation #1003](https://github.com/wjhuang88/talos/pull/1003); source **Completion Commit `bab2bdf31fc8200758397d38077dab57b9dd1aa4`**. [Exact-head CI 8/8](https://github.com/wjhuang88/talos/actions/runs/45160764389) and independent [Copilot APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725) with clean merge CAS. Real preapproved dual-host WWW→CN transport, source-local typed-failure fallback and explicit `[search] backend = "bing-dual"` only; default DDG-first/CN-only Auto and Tool schema preserved. Issue #1001 may close after this owner-first governance publication. Supplier/output rights #1000, #957 default/live, #937 and Epic #624 remain unresolved/open; not production admission.
+[Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): claim #1002 merged before [implementation #1003](https://github.com/wjhuang88/talos/pull/1003); source **Completion Commit `bab2bdf31fc8200758397d38077dab57b9dd1aa4`**. [Exact-head CI 8/8](https://github.com/wjhuang88/talos/actions/runs/45160764389) and independent [Copilot APPROVE](https://github.com/wjhuang88/talos/pull/1003#issuecomment-7103434725) with clean merge CAS. Real preapproved dual-host WWW→CN transport, source-local typed-failure fallback and explicit `[search] backend = "bing-dual"` only; default DDG-first/CN-only Auto and Tool schema preserved. [#1011](https://github.com/wjhuang88/talos/pull/1011) merged `87404cc5dfd91369ab40110714ef2f20a8acaf23`; #1001 Closed. Supplier/output rights #1000, #957 default/live, #937 and Epic #624 remain unresolved/open; not production admission.
 
 ## SEARCH-001-D3-T4 / I333 / #991 — Complete / Closed (offline-only technical integration)
 
