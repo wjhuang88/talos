@@ -269,7 +269,16 @@ pub(crate) fn operation_approval_presentation(
         f.resource_kind == ToolResourceKind::Remote
             && f.normalized_scope == "git:configuration-chain"
     });
-    if !execution && !discovery {
+    // Target-configuration, deletion and child-worktree frontiers intentionally
+    // retain only Read facets: neither configuration discovery nor execution
+    // capability survives. The auxiliary-resolution capability still identifies
+    // these native checkout inspection stages, without authorizing mutation.
+    let read_frontier = facets.iter().all(|f| f.nature == ToolNature::Read)
+        && facets.iter().any(|f| {
+            f.resource_kind == ToolResourceKind::Remote
+                && f.normalized_scope == "git:auxiliary-path-resolution"
+        });
+    if !execution && !discovery && !read_frontier {
         return None;
     }
     // Native Checkout emits the repository root before metadata/source facets.
@@ -534,6 +543,74 @@ mod tests {
             assert_eq!(text.contains("no rollback guarantee"), execution);
             assert_eq!(format_grant_preview(&approval.preview), before);
             assert!(before.contains("file-1999"));
+        }
+        // Mirror AddPlan's intermediate checkout frontiers: remove the
+        // configuration capability and all non-Read facets before publishing
+        // target-configuration/deletion/child inspection requests.
+        facets.retain(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource.as_deref() != Some("git:configuration-chain")
+        });
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:auxiliary-path-resolution",
+            ToolResourceKind::Remote,
+        ));
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            root.path().join("git").to_string_lossy(),
+            ToolResourceKind::Path,
+        ));
+        let external = tempfile::tempdir().expect("external config root");
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            external.path().join("config").to_string_lossy(),
+            ToolResourceKind::Path,
+        ));
+        let input = serde_json::json!({"branch":"existing-topic", "create":false});
+        approval.arguments = input.clone();
+        let request = PermissionRequest::native("git_checkout", &facets, &input);
+        approval.preview = state
+            .propose(
+                &request,
+                &PermissionContext::compatibility(),
+                talos_permission::GrantScope::Session,
+            )
+            .expect("frontier proposal")
+            .preview()
+            .clone();
+        let exact = format_grant_preview(&approval.preview);
+        let display = operation_approval_presentation(&approval).expect("read frontier summary");
+        assert!(display.once_only);
+        assert!(display.summary.len() <= 8);
+        assert!(
+            display
+                .summary
+                .join("\n")
+                .contains("checkout not yet authorized")
+        );
+        assert!(!display.summary.join("\n").contains("Stage: execute"));
+        assert!(exact.contains("file-1999"));
+        assert_eq!(format_grant_preview(&approval.preview), exact);
+        for nature in [ToolNature::Write, ToolNature::Execute] {
+            let mut mixed = facets.clone();
+            mixed.push(ToolPermissionFacet::with_resource(
+                nature,
+                root.path().join("file-0").to_string_lossy(),
+                ToolResourceKind::Path,
+            ));
+            let request = PermissionRequest::native("git_checkout", &mixed, &input);
+            let mut invalid = approval.clone();
+            invalid.preview = state
+                .propose(
+                    &request,
+                    &PermissionContext::compatibility(),
+                    talos_permission::GrantScope::Session,
+                )
+                .expect("mixed proposal")
+                .preview()
+                .clone();
+            assert!(operation_approval_presentation(&invalid).is_none());
         }
         approval.provenance = talos_core::tool::ToolProvenance::McpRemote {
             server: "foreign".into(),
