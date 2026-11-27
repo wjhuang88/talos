@@ -107,7 +107,7 @@ impl AgentTool for ValidationTool {
     }
 
     fn description(&self) -> &str {
-        "Plan or run supported fixed checks in the host-selected project. Use for 'plan validation', 'run workspace checks', or a required check of an accepted implementation task. Do not invoke for ordinary chat, isolated code explanations, or project progress alone (use agile_summary when available). Plan spawns no commands. Run requires Execute permission and may create build artifacts or run build scripts; it is not read-only. Governance checks are internal; Cargo profiles require Rust project prerequisites. Recognition of another language does not supply a host adapter. No arbitrary commands, directory/environment overrides, task edits, activation, Issue changes or release operations. Missing prerequisites and failed checks are not completion evidence."
+        "Plan or run supported fixed checks in the host-selected project. Use for 'plan validation', 'run workspace checks', or a required check of an accepted implementation task. Do not invoke for ordinary chat, isolated code explanations, or project progress alone (use agile_summary when available). Plan spawns no commands. Governance run performs internal read-only checks under normal Read permission. Cargo run requires Execute permission and may create build artifacts or run build scripts; Cargo profiles require Rust project prerequisites. Recognition of another language does not supply a host adapter. No arbitrary commands, directory/environment overrides, task edits, activation, Issue changes or release operations. Missing prerequisites and failed checks are not completion evidence."
     }
 
     fn parameters(&self) -> Value {
@@ -135,6 +135,10 @@ impl AgentTool for ValidationTool {
             }) => {
                 let plan = collect_validation_plan(&self.workspace, profile.into());
                 plan.checks.iter().map(|check| {
+                    if check.execution_mode == talos_conversation::ValidationExecutionMode::Internal {
+                        return ToolPermissionFacet::new(ToolNature::Read)
+                            .with_description("In-process read-only governance validation; no host commands");
+                    }
                     ToolPermissionFacet::with_resource(
                         ToolNature::Execute, check.command, ToolResourceKind::Command,
                     ).with_description("Fixed validation operation; internal: checks run in-process, Cargo checks may run build scripts and write artifacts")
@@ -679,11 +683,56 @@ mod tests {
         .expect("manifest");
         let host = Arc::new(RefusingHost::default());
         let tools = validation_tool_contributions(root.path().to_owned(), host.clone());
-        let result = admitted_run(
-            tools[0].tool().as_ref(),
-            serde_json::json!({"mode":"run", "profile":"governance"}),
-        )
-        .await;
+        let input = serde_json::json!({"mode":"run", "profile":"governance"});
+        let facets = tools[0].tool().permission_profile(&input);
+        assert!(facets.iter().all(|facet| facet.nature == ToolNature::Read));
+        let state = talos_permission::PermissionSessionState::new(
+            talos_permission::PermissionEngine::with_workspace_root(root.path().to_owned()),
+        );
+        let request = PermissionRequest::native("validate_project", &facets, &input);
+        assert!(
+            matches!(
+                state
+                    .begin_invocation(
+                        &request,
+                        &talos_permission::PermissionContext::compatibility()
+                    )
+                    .expect("read admission"),
+                talos_permission::PermissionInvocation::Allow(_)
+            ),
+            "internal read must not ask for Execute"
+        );
+        for rule in [
+            talos_permission::PermissionRule {
+                tool_name: "validate_project".into(),
+                path_pattern: None,
+                decision: talos_permission::PermissionDecision::Deny("fixture deny".into()),
+                nature: None,
+                resource: None,
+                resource_kind: None,
+            },
+            talos_permission::PermissionRule::new_nature(
+                ToolNature::Read,
+                None,
+                None,
+                talos_permission::PermissionDecision::Deny("fixture read deny".into()),
+            ),
+        ] {
+            let mut engine =
+                talos_permission::PermissionEngine::with_workspace_root(root.path().to_owned());
+            engine.add_rule(rule);
+            let denied = talos_permission::PermissionSessionState::new(engine);
+            assert!(matches!(
+                denied
+                    .begin_invocation(
+                        &request,
+                        &talos_permission::PermissionContext::compatibility()
+                    )
+                    .expect("denial evaluation"),
+                talos_permission::PermissionInvocation::Deny(_)
+            ));
+        }
+        let result = admitted_run(tools[0].tool().as_ref(), input).await;
         let evidence: Value = serde_json::from_str(&result.content).expect("structured evidence");
         assert_eq!(evidence["records"].as_array().expect("records").len(), 1);
         assert_eq!(evidence["records"][0]["execution_mode"], "internal");

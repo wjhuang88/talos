@@ -729,7 +729,7 @@ A governance manifest or any two canonical Board/iteration-index/backlog files
 enable summary discovery, including small or Planned projects. Validation uses
 recognized project markers independently: a Cargo-only project qualifies without
 governance files. `validate_project` accepts only `mode: plan|run` and
-`profile: governance|i076|workspace`; plan starts no commands, while run requires
+`profile: governance|i076|workspace`; plan starts no commands, while governance runs use Read admission and Cargo checks in i076 and workspace require command-specific
 Execute admission. Neither tool edits task records, activates iterations or changes
 Issues. Missing prerequisites are reported, not created to enable discovery.
 
