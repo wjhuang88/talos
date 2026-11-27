@@ -559,6 +559,47 @@ fn requires_cargo_manifest(checks: &[ValidationCheck]) -> bool {
     })
 }
 
+/// Governance metadata bound to the directory selected during tool registration.
+pub struct GovernanceWorkspace(cap_std::fs::Dir);
+
+impl GovernanceWorkspace {
+    /// Open the workspace and check its governance markers on the retained handle.
+    pub fn open(path: &Path) -> Option<Self> {
+        let workspace =
+            Self(cap_std::fs::Dir::open_ambient_dir(path, cap_std::ambient_authority()).ok()?);
+        workspace.available().then_some(workspace)
+    }
+
+    /// Check whether governance metadata is still present.
+    pub fn available(&self) -> bool {
+        crate::project_tools::governance_markers(&self.0)
+    }
+
+    /// Describe the internal check offered by this workspace.
+    pub fn plan(&self) -> ValidationPlan {
+        ValidationPlan {
+            profile: ValidationProfile::Governance,
+            project_types: vec![ProjectType::TalosGovernance],
+            checks: vec![governance_check()],
+            findings: Vec::new(),
+        }
+    }
+
+    /// Validate metadata through the original directory handle.
+    pub fn run(&self) -> ValidationEvidence {
+        ValidationEvidence {
+            profile: ValidationProfile::Governance,
+            authority: "in-process governance validation; no host commands",
+            findings: Vec::new(),
+            records: vec![governance_record(
+                &governance_check(),
+                "internal read-only governance check; no host execution requested".into(),
+                crate::governance_summary::validate_directory(&self.0),
+            )],
+        }
+    }
+}
+
 /// Execute only the built-in governance validator, without host process authority.
 ///
 /// This synchronous entry accepts neither a plan nor commands. Hosts that execute
@@ -590,46 +631,55 @@ pub fn run_governance_validation(workspace: &Path) -> ValidationEvidence {
 const HOST_CHECK_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const HOST_OUTPUT_LIMIT: usize = 2 * 1024 * 1024;
 
+fn governance_record(
+    check: &ValidationCheck,
+    permission_decision: String,
+    report: crate::GovernanceValidationReport,
+) -> ValidationEvidenceRecord {
+    let status = if report.errors == 0 {
+        EvidenceStatus::Passed
+    } else {
+        EvidenceStatus::Failed
+    };
+    let stdout_summary = if report.errors == 0 {
+        format!(
+            "Governance validation passed: {} warning(s).",
+            report.warnings
+        )
+    } else {
+        format!(
+            "Governance validation failed: {} error(s), {} warning(s).\n{}",
+            report.errors,
+            report.warnings,
+            report.findings.join("\n")
+        )
+    };
+    ValidationEvidenceRecord {
+        id: check.id,
+        command: check.command,
+        execution_mode: check.execution_mode,
+        required: check.required,
+        source: check.source,
+        ecosystem: check.ecosystem,
+        permission_decision,
+        status,
+        exit_status: Some(if report.errors == 0 { 0 } else { 1 }),
+        stdout_summary,
+        stderr_summary: "<empty>".to_string(),
+    }
+}
+
 fn run_internal_validation_check(
     workspace: &Path,
     check: &ValidationCheck,
     permission_decision: String,
 ) -> ValidationEvidenceRecord {
     match check.id {
-        "governance" => {
-            let report = collect_governance_validation(workspace);
-            let status = if report.errors == 0 {
-                EvidenceStatus::Passed
-            } else {
-                EvidenceStatus::Failed
-            };
-            let stdout_summary = if report.errors == 0 {
-                format!(
-                    "Governance validation passed: {} warning(s).",
-                    report.warnings
-                )
-            } else {
-                format!(
-                    "Governance validation failed: {} error(s), {} warning(s).\n{}",
-                    report.errors,
-                    report.warnings,
-                    report.findings.join("\n")
-                )
-            };
-            ValidationEvidenceRecord {
-                id: check.id,
-                command: check.command,
-                execution_mode: check.execution_mode,
-                required: check.required,
-                source: check.source,
-                ecosystem: check.ecosystem,
-                permission_decision,
-                status,
-                exit_status: Some(if report.errors == 0 { 0 } else { 1 }),
-                stdout_summary,
-                stderr_summary: "<empty>".to_string(),
-            }
-        }
+        "governance" => governance_record(
+            check,
+            permission_decision,
+            collect_governance_validation(workspace),
+        ),
         _ => ValidationEvidenceRecord {
             id: check.id,
             command: check.command,

@@ -9,6 +9,10 @@ pub fn agile_summary_available(workspace: &Path) -> bool {
     else {
         return false;
     };
+    governance_markers(&root)
+}
+
+pub(crate) fn governance_markers(root: &cap_std::fs::Dir) -> bool {
     root.is_file(".agent-governance/manifest.yaml")
         || [
             "docs/BOARD.md",

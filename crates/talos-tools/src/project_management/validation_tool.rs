@@ -7,8 +7,8 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
 use talos_conversation::{
-    EvidenceStatus, ValidationHostExecutor, ValidationProfile, agile_summary_available,
-    collect_validation_plan, render_json_evidence, render_json_plan, run_governance_validation,
+    EvidenceStatus, GovernanceWorkspace, ValidationHostExecutor, render_json_evidence,
+    render_json_plan,
 };
 use talos_core::tool::{
     AgentTool, ToolCleanupOwner, ToolContribution, ToolContributionSource, ToolNature, ToolResult,
@@ -56,16 +56,20 @@ pub fn validation_tool_contributions<T: ValidationHostFactory + 'static>(
 }
 
 pub(super) fn governance_validation_contributions(workspace: PathBuf) -> Vec<ToolContribution> {
-    if !agile_summary_available(&workspace) {
+    let Some(governance) = GovernanceWorkspace::open(&workspace) else {
         return Vec::new();
-    }
+    };
     vec![ToolContribution::new(
         ToolContributionSource::new("builtin.project-management"),
-        Arc::new(ValidationTool { workspace }),
+        Arc::new(ValidationTool {
+            workspace,
+            governance,
+        }),
     )]
 }
 
 struct ValidationTool {
+    governance: GovernanceWorkspace,
     workspace: PathBuf,
 }
 
@@ -93,16 +97,13 @@ impl AgentTool for ValidationTool {
                 "validate_project accepts mode plan/run and optional profile governance",
             );
         };
-        if !agile_summary_available(&self.workspace) {
+        if !self.governance.available() {
             return ToolResult::error("governance metadata unavailable");
         }
         if matches!(input.mode, Mode::Plan) {
-            return ToolResult::success(render_json_plan(&collect_validation_plan(
-                &self.workspace,
-                ValidationProfile::Governance,
-            )));
+            return ToolResult::success(render_json_plan(&self.governance.plan()));
         }
-        let evidence = run_governance_validation(&self.workspace);
+        let evidence = self.governance.run();
         let failed = evidence
             .findings
             .iter()
@@ -123,6 +124,31 @@ impl AgentTool for ValidationTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn registered_validation_retains_original_directory() {
+        let parent = tempfile::tempdir().expect("parent");
+        let workspace = parent.path().join("workspace");
+        std::fs::create_dir_all(workspace.join(".agent-governance")).expect("markers");
+        std::fs::write(
+            workspace.join(".agent-governance/manifest.yaml"),
+            "profile: minimal\n",
+        )
+        .expect("manifest");
+        let tools = governance_validation_contributions(workspace.clone());
+        std::fs::rename(&workspace, parent.path().join("original")).expect("move original");
+        std::fs::create_dir(&workspace).expect("replacement");
+        let result = tools[0]
+            .tool()
+            .execute(serde_json::json!({"mode":"run"}))
+            .await;
+        assert!(
+            result.content.contains("internal:governance_validation"),
+            "{}",
+            result.content
+        );
+    }
+
     #[test]
     fn accepts_only_governance_profiles() {
         for mode in ["run", "plan"] {

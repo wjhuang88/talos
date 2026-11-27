@@ -296,7 +296,7 @@ pub fn collect_governance_validation(workspace: &Path) -> GovernanceValidationRe
     }
 }
 
-fn validate_directory(workspace: &Dir) -> GovernanceValidationReport {
+pub(crate) fn validate_directory(workspace: &Dir) -> GovernanceValidationReport {
     let mut report = GovernanceValidationReport::new();
     let manifest_path = Path::new(".agent-governance").join("manifest.yaml");
     let Ok(manifest) = workspace.read_to_string(&manifest_path) else {
