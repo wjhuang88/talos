@@ -1,6 +1,6 @@
 # VALIDATION-004 · validate_project 内部治理检查的 Read 权限
 
-状态：Refinement / Unclaimed。实施范围为 talos-tools 的 validate_project 权限分类与相应用户文档。
+状态：Active / Claimed（#1050 合入 main 后生效）。实施范围为 talos-tools 的 validate_project 权限分类与相应用户文档。
 
 当前 main 在 run 模式对治理检查和 Cargo 检查均生成 Execute facet。用户运行固定的进程内治理检查时会收到命令执行权限请求。期望内部只读检查走常规 Read 规则，主机命令继续按其精确 Execute 资源准入。
 
@@ -8,17 +8,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | Codex |
+| Executing Agent | Codex |
 | Work Slice | Internal governance validation permission classification |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-28 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #1050 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer requested recovery of the validation change; independent permission review required |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-26 |
+| Last Updated | 2026-11-28 |
 | Handoff / Release Condition | Independent permission review and locked tool tests |
 
 Required reads include [VALIDATION-003](VALIDATION-003-model-validation-agile-tools.md) and the executable validation-tool permission tests.
