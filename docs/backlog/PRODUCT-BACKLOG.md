@@ -1,3 +1,7 @@
+## MCP-002 / #1033 — supervised stdio MCP cleanup (intake only)
+
+[Owner](active/MCP-002-stdio-process-supervision.md): Intake / Unclaimed. Native macOS connection-lifetime cleanup, including separate-group helpers; refine safe ownership and isolation before implementation selection. No implementation authorization.
+
 ## GIT-002 — Fetch、Rebase 与 Pull 策略
 
 Refinement / Unclaimed。[任务、验收与 Required Reads](active/GIT-002-fetch-rebase-pull-strategy.md)。新增独立原生 Fetch/Rebase 工具及可选 Pull 策略；待有效认领与权限安全审查，不代表已实现。
