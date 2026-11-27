@@ -227,15 +227,15 @@ pub(crate) fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".talos")
         .join("memory.db");
-    set_memory_provider_for_path(agent, mem_config, memory_db);
+    set_memory_provider_for_path(agent, mem_config, memory_db, Arc::new(StdMutex::new(None)));
 }
 
 fn set_memory_provider_for_path(
     agent: &mut Agent,
     mem_config: talos_memory::MemoryPromptConfig,
     memory_db: PathBuf,
+    memory_store: Arc<StdMutex<Option<MemoryStore>>>,
 ) {
-    let memory_store = Arc::new(StdMutex::new(None::<MemoryStore>));
     let provider = std::sync::Arc::new(move |query: &str| -> Option<String> {
         if !memory_db.exists() {
             tracing::debug!(
@@ -676,6 +676,7 @@ mod tests {
                 None,
                 root.path().to_path_buf(),
             );
+            let memory_store = Arc::new(StdMutex::new(None));
             set_memory_provider_for_path(
                 &mut agent,
                 talos_memory::MemoryPromptConfig {
@@ -683,7 +684,9 @@ mod tests {
                     ..Default::default()
                 },
                 memory_db.clone(),
+                Arc::clone(&memory_store),
             );
+            assert!(memory_store.lock().expect("memory cache").is_none());
 
             if existing {
                 assert_eq!(
@@ -700,6 +703,7 @@ mod tests {
                     .expect("provider request preview");
                 assert!(!preview.contains("## Relevant Memory"));
                 assert!(!memory_dir.exists(), "missing store remains uninitialized");
+                assert!(memory_store.lock().expect("memory cache").is_none());
                 std::fs::create_dir_all(&memory_dir).expect("late memory directory");
                 std::fs::File::create(&memory_db).expect("late empty database");
             }
@@ -710,13 +714,19 @@ mod tests {
                 .expect("query opens existing store")
                 .expect("provider request preview");
             assert!(!preview.contains("## Relevant Memory"));
-            assert!(
-                std::fs::metadata(&memory_db)
-                    .expect("opened database")
-                    .len()
-                    > 0,
-                "first query must initialize the existing SQLite file"
-            );
+            {
+                // Inspect the actual cached connection before any second open can migrate it.
+                let cache = memory_store.lock().expect("memory cache");
+                let store = cache.as_ref().expect("first query opens and migrates store");
+                assert_eq!(store.count().expect("migrated memory table"), 0);
+                assert!(
+                    store
+                        .retrieve("orchid", 1)
+                        .expect("migrated FTS table")
+                        .is_empty()
+                );
+                store.memory_status().expect("migrated memory schema");
+            }
 
             {
                 let mut store = MemoryStore::open(&memory_db).expect("seed opened store");
