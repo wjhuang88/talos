@@ -19,6 +19,45 @@ const TOOL_CALL_ARGS_BUDGET_CHARS: usize = 180;
 
 /// Converts a structured background-job result into a bounded human-facing
 /// summary while leaving the raw result available to the model/transcript.
+fn checkpoint_result_summary(display: &ToolResultDisplay) -> Option<String> {
+    if display.is_error {
+        return None;
+    }
+    match display.tool_name.as_deref()? {
+        "compact_context" => {
+            let value: serde_json::Value = serde_json::from_str(&display.content).ok()?;
+            let status = value["status"].as_str()?;
+            let label = match status {
+                "Admitted" => "已受理，等待应用",
+                "Applied" => "已应用",
+                other => other,
+            };
+            Some(format!(
+                "检查点 #{} · {label}",
+                value["operation_id"].as_u64()?
+            ))
+        }
+        "history_search" => {
+            let value: serde_json::Value = serde_json::from_str(&display.content).ok()?;
+            if let Some(text) = value["text"].as_str() {
+                return Some(truncate_single_line(text, 180));
+            }
+            let (items, label) = if let Some(items) = value["sources"].as_array() {
+                (items, "条历史来源")
+            } else {
+                (value["results"].as_array()?, "条匹配记录")
+            };
+            let more = if value["complete"].as_bool() == Some(false) {
+                "，还有下一页"
+            } else {
+                ""
+            };
+            Some(format!("本页 {} {label}{more}", items.len()))
+        }
+        _ => None,
+    }
+}
+
 fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
     let tool_name = display.tool_name.as_deref()?.strip_prefix("background:")?;
     if !matches!(tool_name, "bash" | "exec" | "process") {
@@ -124,10 +163,37 @@ pub(crate) fn truncate_single_line(s: &str, max: usize) -> String {
 }
 
 pub(crate) fn summarize_tool_args(
-    _tool_name: &str,
+    tool_name: &str,
     args_str: &str,
     summary_fields: &[String],
 ) -> String {
+    if let Ok(args) = serde_json::from_str::<serde_json::Value>(args_str) {
+        let summary = match tool_name {
+            "git_branch_list" if args.is_object() => Some(
+                match args["remote"].as_bool() {
+                    Some(true) => "本地和远端分支",
+                    _ => "本地分支",
+                }
+                .to_owned(),
+            ),
+            "git_status" if args.as_object().is_some_and(|o| o.is_empty()) => {
+                Some("工作区状态".to_owned())
+            }
+            "compact_context" => Some("提交上下文检查点".to_owned()),
+            "history_search" => args["mode"].as_str().map(|mode| match mode {
+                "discover" => "列出可压缩的历史".to_owned(),
+                "search" | "source_search" => {
+                    format!("搜索历史 · {}", args["query"].as_str().unwrap_or(""))
+                }
+                "detail" | "source_detail" => "读取历史详情".to_owned(),
+                other => other.to_owned(),
+            }),
+            _ => None,
+        };
+        if let Some(summary) = summary {
+            return truncate_single_line(&summary, TOOL_CALL_ARGS_BUDGET_CHARS);
+        }
+    }
     summarize_tool_args_with_budget(args_str, summary_fields, TOOL_CALL_ARGS_BUDGET_CHARS)
 }
 
@@ -367,7 +433,9 @@ pub(crate) fn build_tool_result_display_lines(
         )];
     }
 
-    if let Some(summary) = background_job_projection(display) {
+    if let Some(summary) =
+        checkpoint_result_summary(display).or_else(|| background_job_projection(display))
+    {
         let (line_color, attrs) = if display.is_error {
             (color, primary_result_attrs())
         } else {
@@ -846,6 +914,39 @@ mod tests {
         assert!(!lines[0].segments[0].attrs.bold);
 
         assert_eq!(lines[0].text, "   output line");
+    }
+
+    #[test]
+    fn checkpoint_tools_render_human_readable_summaries() {
+        assert_eq!(summarize_tool_args("git_status", "{}", &[]), "工作区状态");
+        for (args, expected) in [
+            ("{}", "本地分支"),
+            (r#"{"remote":false}"#, "本地分支"),
+            (r#"{"remote":true}"#, "本地和远端分支"),
+        ] {
+            assert_eq!(summarize_tool_args("git_branch_list", args, &[]), expected);
+        }
+        for (name, raw, expected) in [
+            (
+                "compact_context",
+                r#"{"operation_id":0,"status":"Admitted"}"#,
+                "检查点 #0 · 已受理，等待应用",
+            ),
+            (
+                "history_search",
+                r#"{"sources":["a","b"],"complete":false}"#,
+                "本页 2 条历史来源，还有下一页",
+            ),
+        ] {
+            let display = ToolResultDisplay {
+                tool_name: Some(name.into()),
+                content: raw.into(),
+                todo_presentation: None,
+                is_error: false,
+            };
+            let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+            assert_eq!(lines[0].text.trim(), expected);
+        }
     }
 
     #[test]
