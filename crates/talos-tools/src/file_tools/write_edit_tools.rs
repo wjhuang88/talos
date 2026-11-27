@@ -1028,13 +1028,17 @@ fn bounded_preview(content: &str) -> String {
             break;
         }
 
-        // A clipped later row still needs its own line; reserve the separator
-        // before calculating the remaining content budget.
+        let separator_chars = usize::from(idx > 0);
+        let remaining = MAX_PREVIEW_CHARS - used_chars;
+        if remaining <= separator_chars {
+            truncated = true;
+            break;
+        }
         if idx > 0 {
             rendered.push('\n');
             used_chars += 1;
         }
-        let remaining = MAX_PREVIEW_CHARS - used_chars;
+        let remaining = remaining - separator_chars;
         let line_chars = line.chars().count();
         if line_chars > remaining {
             rendered.push_str(&line.chars().take(remaining).collect::<String>());

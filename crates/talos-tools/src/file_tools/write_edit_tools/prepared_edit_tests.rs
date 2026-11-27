@@ -5,6 +5,19 @@ use talos_permission::{
 };
 
 #[test]
+fn preview_omits_separator_when_no_next_row_character_fits() {
+    let first = "中".repeat(MAX_PREVIEW_CHARS - 1);
+    let input = format!("{first}\nx");
+    assert_eq!(
+        bounded_preview(&input),
+        format!(
+            "{first}\n... preview truncated (2 lines, {} bytes total)",
+            input.len()
+        )
+    );
+}
+
+#[test]
 fn numbered_preview_bounds_do_not_number_omission_markers() {
     let content = format!(
         "{}\n{}",
