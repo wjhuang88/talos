@@ -212,3 +212,22 @@ supplied labels may authorize the five compatibility replacements. Keep
 existing supported CLI and ADR-089 authority; native original-environment
 17 MiB Checkout/Commit, independent security review and maintainer
 acceptance remain required. #919 stays Open.
+
+
+## 2026-11-27 D2.2 accepted evidence and D2.3 decision gate
+
+#1032 merged `ec3504ef4036abf76cb44fa3c781cdb57c98c918` after exact-head
+CI #4666 rerun success, 13 standalone tests, 6 reachable images/24 declared
+edges/6 unresolved names, 1170 Windows talos-tools passed/2 ignored,
+both governance validators and independent candidate-only APPROVE.
+Remote #1033 registration remains a separately routed advisory residual;
+prior Windows checkpoint failure remains historical evidence.
+
+See [D2.3 feasibility proposal](../proposals/i324-loader-source-equivalence-feasibility.md).
+It records why the static graph, file guards and device-wide code integrity
+are not a complete pre-spawn attestor, defines the source-equivalence
+property and falsifiers, and requests independent review of any concrete
+enforced deployment boundary. Recommendation: preserve strict D1 and keep
+affected replacements Unsupported until a concrete trusted mechanism is
+proven or a separate exact-text decision is accepted. No production
+implementation, permission change or issue completion is claimed.
