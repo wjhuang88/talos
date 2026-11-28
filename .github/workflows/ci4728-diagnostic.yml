@@ -45,5 +45,5 @@ jobs:
               if ($LASTEXITCODE) { $failed = $true }
               Pop-Location
             }
-          if ($failed) { exit 1 }
           }
+          if ($failed) { exit 1 }
