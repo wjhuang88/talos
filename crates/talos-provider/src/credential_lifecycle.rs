@@ -647,6 +647,18 @@ impl CredentialResolver {
         })
     }
 
+    // Check at the actual admission boundary, not just before a potentially
+    // contended registry lock or an injected clock sample.
+    fn check_admission(deadline: Instant, cancellation: Option<&Cancellation>) -> Result<()> {
+        if cancellation.is_some_and(Cancellation::is_cancelled) {
+            return Err(CredentialError::Cancelled);
+        }
+        if Instant::now() >= deadline {
+            return Err(CredentialError::Deadline);
+        }
+        Ok(())
+    }
+
     /// Acquire a cached or single-flight lease. Dropping the future detaches the waiter.
     /// Caller cancellation does not cancel other waiters.
     pub async fn acquire(
@@ -655,16 +667,14 @@ impl CredentialResolver {
         deadline: Instant,
         mut cancellation: Cancellation,
     ) -> Result<LeaseRef> {
-        if cancellation.is_cancelled() {
-            return Err(CredentialError::Cancelled);
-        }
-        if Instant::now() >= deadline {
-            return Err(CredentialError::Deadline);
-        }
+        Self::check_admission(deadline, Some(&cancellation))?;
         let (id, mut receiver) = {
             let mut state = self.lock()?;
+            Self::check_admission(deadline, Some(&cancellation))?;
             self.check(&state, binding)?;
-            let now = self.observe_clock(&mut state)?;
+            let observed = self.observe_clock(&mut state);
+            Self::check_admission(deadline, Some(&cancellation))?;
+            let now = observed?;
             if let Some(Entry::Cached(lease, _)) = state.entries.get(&binding) {
                 return Ok(*lease);
             }
@@ -723,7 +733,10 @@ impl CredentialResolver {
                     .as_ref().copied().ok_or(CredentialError::Unavailable)?
             }
         }?;
-        self.validate_current(binding, result, deadline)?;
+        {
+            let mut state = self.lock()?;
+            self.current(&mut state, binding, result, deadline, Some(&cancellation))?;
+        }
         Ok(result)
     }
 
@@ -808,12 +821,13 @@ impl CredentialResolver {
         binding: Binding,
         lease: LeaseRef,
         deadline: Instant,
+        cancellation: Option<&Cancellation>,
     ) -> Result<&'a CredentialMaterial> {
+        Self::check_admission(deadline, cancellation)?;
         self.check(state, binding)?;
-        if Instant::now() >= deadline {
-            return Err(CredentialError::Deadline);
-        }
-        self.observe_clock(state)?;
+        let observed = self.observe_clock(state);
+        Self::check_admission(deadline, cancellation)?;
+        observed?;
         match state.entries.get(&binding) {
             Some(Entry::Cached(current, material)) if *current == lease => Ok(material),
             _ => Err(CredentialError::Stale),
@@ -829,7 +843,7 @@ impl CredentialResolver {
         deadline: Instant,
     ) -> Result<()> {
         let mut state = self.lock()?;
-        self.current(&mut state, binding, lease, deadline)
+        self.current(&mut state, binding, lease, deadline, None)
             .map(|_| ())
     }
 
@@ -843,7 +857,7 @@ impl CredentialResolver {
         consume: impl FnOnce(&[u8]) -> T,
     ) -> Result<T> {
         let mut state = self.lock()?;
-        let material = self.current(&mut state, binding, lease, deadline)?;
+        let material = self.current(&mut state, binding, lease, deadline, None)?;
         Ok(consume(&material.0))
     }
 

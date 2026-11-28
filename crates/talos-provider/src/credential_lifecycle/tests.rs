@@ -84,20 +84,60 @@ impl CredentialSource for DelayedSource {
     }
 }
 
-struct FakeClock(Mutex<ClockSample>);
+struct SampleGate {
+    skip: usize,
+    entered: oneshot::Sender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+}
+
+struct FakeClock {
+    sample: Mutex<ClockSample>,
+    gate: Mutex<Option<SampleGate>>,
+}
 
 impl FakeClock {
     fn set(&self, monotonic: u64, wall: u64) {
-        *self.0.lock().expect("clock lock") = ClockSample {
+        *self.sample.lock().expect("clock lock") = ClockSample {
             monotonic: Duration::from_secs(monotonic),
             wall: Duration::from_secs(wall),
         };
+    }
+
+    fn pause_sample(
+        &self,
+        skip: usize,
+    ) -> (oneshot::Receiver<()>, std::sync::mpsc::Sender<()>) {
+        let (entered, entry) = oneshot::channel();
+        let (release, exit) = std::sync::mpsc::channel();
+        let previous = self.gate.lock().expect("gate lock").replace(SampleGate {
+            skip,
+            entered,
+            release: exit,
+        });
+        assert!(previous.is_none());
+        (entry, release)
     }
 }
 
 impl CredentialClock for FakeClock {
     fn sample(&self) -> Result<ClockSample> {
-        Ok(*self.0.lock().expect("clock lock"))
+        let gate = {
+            let mut slot = self.gate.lock().expect("gate lock");
+            match slot.as_mut() {
+                Some(gate) if gate.skip > 0 => {
+                    gate.skip -= 1;
+                    None
+                }
+                _ => slot.take(),
+            }
+        };
+        if let Some(gate) = gate {
+            gate.entered.send(()).expect("sample entered");
+            gate.release
+                .recv_timeout(Duration::from_secs(10))
+                .expect("sample released");
+        }
+        Ok(*self.sample.lock().expect("clock lock"))
     }
 }
 
@@ -112,10 +152,13 @@ type Fixture = (
 fn fixture() -> Fixture {
     let counters = Arc::new(Counters::default());
     let (started, receiver) = mpsc::unbounded_channel();
-    let clock = Arc::new(FakeClock(Mutex::new(ClockSample {
-        monotonic: Duration::from_secs(100),
-        wall: Duration::from_secs(1000),
-    })));
+    let clock = Arc::new(FakeClock {
+        sample: Mutex::new(ClockSample {
+            monotonic: Duration::from_secs(100),
+            wall: Duration::from_secs(1000),
+        }),
+        gate: Mutex::new(None),
+    });
     let resolver = CredentialResolver::with_clock(
         Arc::new(DelayedSource {
             counters: Arc::clone(&counters),
@@ -1036,4 +1079,150 @@ fn invalid_or_oversized_enrollment_preserves_current_binding() {
         Err(CredentialError::Capacity)
     );
     assert!(bind(&resolver, base) == binding);
+}
+
+
+// Run the synchronous registry/clock section on a blocking worker entered into
+// the same paused Tokio runtime. The test thread can advance its clock or cancel
+// after sample entry, while the worker still owns the registry gate.
+async fn terminate_at_sample(
+    entered: oneshot::Receiver<()>,
+    release: std::sync::mpsc::Sender<()>,
+    cancel: &watch::Sender<bool>,
+    terminal: CredentialError,
+) {
+    tokio::time::timeout(Duration::from_secs(10), entered)
+        .await
+        .expect("clock sample entered before timeout")
+        .expect("sample entry signal");
+    match terminal {
+        CredentialError::Cancelled => {
+            cancel.send_replace(true);
+        }
+        CredentialError::Deadline => {
+            tokio::time::advance(Duration::from_secs(5)).await;
+        }
+        _ => panic!("unexpected terminal condition"),
+    }
+    release.send(()).expect("release sample");
+}
+
+async fn acquire_admission_race(cached: bool) {
+    for terminal in [CredentialError::Cancelled, CredentialError::Deadline] {
+        let (resolver, counters, mut started, clock, binding) = fixture();
+        let existing = if cached {
+            Some(install(&resolver, binding, &mut started).await)
+        } else {
+            None
+        };
+        let calls = counters.calls.load(Ordering::SeqCst);
+        let sequence = resolver.lock().expect("registry").sequence;
+        let (entered, release) = clock.pause_sample(0);
+        let (cancel, signal) = cancellation_pair();
+        let caller_deadline = Instant::now() + Duration::from_secs(5);
+        let worker = {
+            let resolver = Arc::clone(&resolver);
+            tokio::task::spawn_blocking(move || {
+                tokio::runtime::Handle::current().block_on(resolver.acquire(
+                    binding,
+                    caller_deadline,
+                    signal,
+                ))
+            })
+        };
+        terminate_at_sample(entered, release, &cancel, terminal).await;
+        assert_eq!(worker.await.expect("caller joined"), Err(terminal));
+        {
+            let state = resolver.lock().expect("registry");
+            // Even a spawned-and-immediately-retired flight would advance sequence.
+            assert_eq!(state.sequence, sequence);
+            assert_eq!(state.waiters, 0);
+            assert!(state.producers.is_empty());
+            assert_eq!(state.entries.len(), if cached { 1 } else { 0 });
+        }
+        assert_eq!(counters.calls.load(Ordering::SeqCst), calls);
+        assert!(started.try_recv().is_err());
+        if let Some(lease) = existing {
+            assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+        }
+        resolver.shutdown(deadline()).await.expect("shutdown");
+        assert_eq!(counters.calls.load(Ordering::SeqCst), calls);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn cached_acquire_rechecks_terminal_caller_after_clock_sample() {
+    acquire_admission_race(true).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn uncached_acquire_rechecks_terminal_caller_before_flight_admission() {
+    acquire_admission_race(false).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn acquire_rechecks_terminal_caller_during_final_lease_validation() {
+    for terminal in [CredentialError::Cancelled, CredentialError::Deadline] {
+        let (resolver, counters, mut started, clock, binding) = fixture();
+        let (cancel, signal) = cancellation_pair();
+        let caller_deadline = Instant::now() + Duration::from_secs(5);
+        let worker = {
+            let resolver = Arc::clone(&resolver);
+            tokio::task::spawn_blocking(move || {
+                tokio::runtime::Handle::current().block_on(resolver.acquire(
+                    binding,
+                    caller_deadline,
+                    signal,
+                ))
+            })
+        };
+        let producer = started.recv().await.expect("producer enters");
+        // Skip producer publication's sample; pause the waiting caller's final
+        // validation after it has already received the successful flight result.
+        let (entered, release) = clock.pause_sample(1);
+        producer.release.send(()).expect("release producer");
+        terminate_at_sample(entered, release, &cancel, terminal).await;
+        assert_eq!(worker.await.expect("caller joined"), Err(terminal));
+        assert_eq!(resolver.lock().expect("registry").waiters, 0);
+        assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
+        let (_cancel, signal) = cancellation_pair();
+        let lease = resolver
+            .acquire(binding, deadline(), signal)
+            .await
+            .expect("published lease remains usable for another caller");
+        assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+        assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
+        resolver.shutdown(deadline()).await.expect("shutdown");
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn current_rechecks_deadline_before_validation_or_secret_access() {
+    let (resolver, counters, mut started, clock, binding) = fixture();
+    let lease = install(&resolver, binding, &mut started).await;
+    let consumed = Arc::new(AtomicUsize::new(0));
+    for scoped in [false, true] {
+        let (entered, release) = clock.pause_sample(0);
+        let caller_deadline = Instant::now() + Duration::from_secs(5);
+        let worker = {
+            let resolver = Arc::clone(&resolver);
+            let consumed = Arc::clone(&consumed);
+            tokio::task::spawn_blocking(move || {
+                if scoped {
+                    resolver.with_current_credential(binding, lease, caller_deadline, |_| {
+                        consumed.fetch_add(1, Ordering::SeqCst);
+                    })
+                } else {
+                    resolver.validate_current(binding, lease, caller_deadline)
+                }
+            })
+        };
+        let (cancel, _signal) = cancellation_pair();
+        terminate_at_sample(entered, release, &cancel, CredentialError::Deadline).await;
+        assert_eq!(worker.await.expect("validation joined"), Err(CredentialError::Deadline));
+        assert_eq!(consumed.load(Ordering::SeqCst), 0);
+        assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+        assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
+    }
+    resolver.shutdown(deadline()).await.expect("shutdown");
 }
