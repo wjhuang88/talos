@@ -457,10 +457,7 @@ impl CredentialResolver {
         Self::with_clock(source, Arc::new(SystemClock(std::time::Instant::now())))
     }
 
-    fn with_clock(
-        source: Arc<dyn CredentialSource>,
-        clock: Arc<dyn CredentialClock>,
-    ) -> Arc<Self> {
+    fn with_clock(source: Arc<dyn CredentialSource>, clock: Arc<dyn CredentialClock>) -> Arc<Self> {
         Arc::new(Self {
             identity: Uuid::new_v4(),
             state: Mutex::new(State {
@@ -496,9 +493,13 @@ impl CredentialResolver {
     fn check(&self, state: &State, binding: Binding) -> Result<()> {
         if state.closed
             || binding.context != self.identity
-            || !state.profiles.get(&binding.spec.profile).is_some_and(|profile| {
-                profile.generation == binding.generation && profile.bindings.contains(&binding.spec)
-            })
+            || !state
+                .profiles
+                .get(&binding.spec.profile)
+                .is_some_and(|profile| {
+                    profile.generation == binding.generation
+                        && profile.bindings.contains(&binding.spec)
+                })
         {
             return Err(CredentialError::Revoked);
         }

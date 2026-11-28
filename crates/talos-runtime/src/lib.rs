@@ -6422,8 +6422,13 @@ mod tests {
             .provider(provider)
             .build()
             .expect("runtime builds without credential context");
-        runtime.preview_request("inspect legacy request").await.expect("preview");
-        let status = collect_until_turn_completed(&mut runtime).await.expect("completion");
+        runtime
+            .preview_request("inspect legacy request")
+            .await
+            .expect("preview");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("completion");
         match status {
             TurnCompletionStatus::Success { final_text, .. } => {
                 assert!(final_text.contains("Request preview (no API call made)"));

@@ -124,7 +124,9 @@ fn fixture() -> Fixture {
         clock.clone(),
     );
     let spec = spec(Uuid::new_v4());
-    resolver.replace_profile(spec.profile, &[spec]).expect("enroll");
+    resolver
+        .replace_profile(spec.profile, &[spec])
+        .expect("enroll");
     let binding = bind(&resolver, spec);
     (resolver, counters, receiver, clock, binding)
 }
@@ -189,7 +191,10 @@ async fn explicit_conflicts_rejected_before_store_acquisition_or_dispatch() {
     let spec = valid.spec();
     let dynamic = Source::Dynamic(spec.source);
     let wrong = Source::Dynamic(Uuid::new_v4());
-    let mismatched = BindingSpec { source: Uuid::new_v4(), ..spec };
+    let mismatched = BindingSpec {
+        source: Uuid::new_v4(),
+        ..spec
+    };
     for (requested, sources) in [
         (spec, vec![dynamic, wrong]),
         (spec, vec![dynamic, Source::Static]),
@@ -231,7 +236,9 @@ async fn explicit_conflicts_rejected_before_store_acquisition_or_dispatch() {
 async fn retired_producers_hold_capacity_until_actual_exit() {
     let (resolver, counters, mut started, _clock, binding) = fixture();
     let other_spec = spec(binding.spec().profile);
-    resolver.replace_profile(binding.spec().profile, &[binding.spec(), other_spec]).expect("enroll distinct keys");
+    resolver
+        .replace_profile(binding.spec().profile, &[binding.spec(), other_spec])
+        .expect("enroll distinct keys");
     let binding = bind(&resolver, binding.spec());
     let other = bind(&resolver, other_spec);
     let mut retired = Vec::new();
@@ -449,7 +456,10 @@ fn expiry_bounds_and_invalid_expiry() {
     value.absolute_expiry = None;
     assert!(Expiry::calculate(start, &value).is_err());
     value.ttl = Some(Duration::from_secs(100));
-    let overflow = ClockSample { monotonic: Duration::MAX, wall: start.wall };
+    let overflow = ClockSample {
+        monotonic: Duration::MAX,
+        wall: start.wall,
+    };
     assert!(Expiry::calculate(overflow, &value).is_err());
 }
 
@@ -457,8 +467,12 @@ fn expiry_bounds_and_invalid_expiry() {
 async fn cache_capacity_reclaims_only_expired_idle_entries() {
     let (resolver, counters, mut started, clock, first) = fixture();
     let specs: Vec<_> = (0..SLOTS).map(|_| spec(first.spec().profile)).collect();
-    let inventory: Vec<_> = std::iter::once(first.spec()).chain(specs.iter().copied()).collect();
-    resolver.replace_profile(first.spec().profile, &inventory).expect("enroll");
+    let inventory: Vec<_> = std::iter::once(first.spec())
+        .chain(specs.iter().copied())
+        .collect();
+    resolver
+        .replace_profile(first.spec().profile, &inventory)
+        .expect("enroll");
     let first = bind(&resolver, first.spec());
     let mut leases = Vec::new();
     for spec in specs {
@@ -704,45 +718,75 @@ fn store_callback_can_reenter_registry_without_deadlocking() {
     worker.join().expect("worker joined");
 }
 
-
 #[tokio::test]
 async fn enrollment_checks_all_binding_dimensions_and_context_isolation() {
     let (resolver, counters, mut started, _clock, first) = fixture();
     let base = first.spec();
     let variants = [
-        BindingSpec { account: Uuid::new_v4(), ..base },
-        BindingSpec { audience: Uuid::new_v4(), ..base },
-        BindingSpec { source: Uuid::new_v4(), ..base },
-        BindingSpec { profile: Uuid::new_v4(), ..base },
+        BindingSpec {
+            account: Uuid::new_v4(),
+            ..base
+        },
+        BindingSpec {
+            audience: Uuid::new_v4(),
+            ..base
+        },
+        BindingSpec {
+            source: Uuid::new_v4(),
+            ..base
+        },
+        BindingSpec {
+            profile: Uuid::new_v4(),
+            ..base
+        },
     ];
     for requested in variants {
         assert!(matches!(
-            resolver.bind(requested, SourceSelection::Explicit(&[Source::Dynamic(requested.source)])),
+            resolver.bind(
+                requested,
+                SourceSelection::Explicit(&[Source::Dynamic(requested.source)])
+            ),
             Err(CredentialError::Configuration)
         ));
     }
     assert_eq!(counters.calls.load(Ordering::SeqCst), 0);
     let inventory = [base, variants[0], variants[1], variants[2]];
-    resolver.replace_profile(base.profile, &inventory).expect("trusted enrollment");
-    resolver.replace_profile(variants[3].profile, &[variants[3]]).expect("separate profile");
+    resolver
+        .replace_profile(base.profile, &inventory)
+        .expect("trusted enrollment");
+    resolver
+        .replace_profile(variants[3].profile, &[variants[3]])
+        .expect("separate profile");
     let base_binding = bind(&resolver, base);
     let original = install(&resolver, base_binding, &mut started).await;
     for requested in variants {
         let binding = bind(&resolver, requested);
         let lease = install(&resolver, binding, &mut started).await;
         assert_ne!(lease, original);
-        assert_eq!(resolver.validate_current(binding, original, deadline()), Err(CredentialError::Stale));
-        assert_eq!(resolver.invalidate_if_current(binding, original), Ok(Invalidation::Stale));
+        assert_eq!(
+            resolver.validate_current(binding, original, deadline()),
+            Err(CredentialError::Stale)
+        );
+        assert_eq!(
+            resolver.invalidate_if_current(binding, original),
+            Ok(Invalidation::Stale)
+        );
     }
     assert_eq!(counters.calls.load(Ordering::SeqCst), 5);
-    assert_eq!(resolver.validate_current(base_binding, original, deadline()), Ok(()));
+    assert_eq!(
+        resolver.validate_current(base_binding, original, deadline()),
+        Ok(())
+    );
 }
 
 #[tokio::test]
 async fn explicit_sdk_context_shares_resolver_and_closes_outstanding_handles() {
     let counters = Arc::new(Counters::default());
     let (events, mut started) = mpsc::unbounded_channel();
-    let source = Arc::new(DelayedSource { counters: Arc::clone(&counters), started: events });
+    let source = Arc::new(DelayedSource {
+        counters: Arc::clone(&counters),
+        started: events,
+    });
     let context = CredentialContext::new(source.clone());
     let independent = CredentialContext::new(source);
     let first = context.resolver();
@@ -751,8 +795,12 @@ async fn explicit_sdk_context_shares_resolver_and_closes_outstanding_handles() {
     assert!(Arc::ptr_eq(&first, &second));
     assert!(!Arc::ptr_eq(&first, &other));
     let spec = spec(Uuid::new_v4());
-    first.replace_profile(spec.profile, &[spec]).expect("enroll");
-    other.replace_profile(spec.profile, &[spec]).expect("enroll separate host");
+    first
+        .replace_profile(spec.profile, &[spec])
+        .expect("enroll");
+    other
+        .replace_profile(spec.profile, &[spec])
+        .expect("enroll separate host");
     let binding = bind(&first, spec);
     let (_cancel, waiter, producer) = start(&first, binding, &mut started).await;
     let (_cancel, signal) = cancellation_pair();
@@ -764,19 +812,36 @@ async fn explicit_sdk_context_shares_resolver_and_closes_outstanding_handles() {
     assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
     let other_binding = bind(&other, spec);
     let (_cancel, signal) = cancellation_pair();
-    assert_eq!(other.acquire(binding, deadline(), signal).await, Err(CredentialError::Revoked));
+    assert_eq!(
+        other.acquire(binding, deadline(), signal).await,
+        Err(CredentialError::Revoked)
+    );
     let independent_lease = install(&other, other_binding, &mut started).await;
     assert_ne!(lease, independent_lease);
     context.shutdown(deadline()).await.expect("explicit close");
-    assert_eq!(second.validate_current(binding, lease, deadline()), Err(CredentialError::Revoked));
-    assert_eq!(other.validate_current(other_binding, independent_lease, deadline()), Ok(()));
-    other.invalidate_if_current(other_binding, independent_lease).expect("refresh");
+    assert_eq!(
+        second.validate_current(binding, lease, deadline()),
+        Err(CredentialError::Revoked)
+    );
+    assert_eq!(
+        other.validate_current(other_binding, independent_lease, deadline()),
+        Ok(())
+    );
+    other
+        .invalidate_if_current(other_binding, independent_lease)
+        .expect("refresh");
     let (_cancel, waiter, producer) = start(&other, other_binding, &mut started).await;
     drop(independent);
     assert_eq!(waiter.await.expect("waiter"), Err(CredentialError::Revoked));
     assert!(producer.cancellation.is_cancelled());
-    producer.release.send(()).expect("finish cancelled producer");
-    other.shutdown(deadline()).await.expect("join after owner drop");
+    producer
+        .release
+        .send(())
+        .expect("finish cancelled producer");
+    other
+        .shutdown(deadline())
+        .await
+        .expect("join after owner drop");
     assert_eq!(counters.running.load(Ordering::SeqCst), 0);
 }
 
@@ -784,7 +849,9 @@ async fn explicit_sdk_context_shares_resolver_and_closes_outstanding_handles() {
 async fn waiter_limits_hold_across_keys_and_release_on_future_drop() {
     let (resolver, counters, mut started, _clock, first) = fixture();
     let specs: Vec<_> = (0..5).map(|_| spec(first.spec().profile)).collect();
-    resolver.replace_profile(first.spec().profile, &specs).expect("enroll");
+    resolver
+        .replace_profile(first.spec().profile, &specs)
+        .expect("enroll");
     let bindings: Vec<_> = specs.iter().map(|spec| bind(&resolver, *spec)).collect();
     let mut pending = Vec::new();
     let mut producers = Vec::new();
@@ -795,15 +862,23 @@ async fn waiter_limits_hold_across_keys_and_release_on_future_drop() {
             assert!(futures_util::poll!(&mut future).is_pending());
             pending.push((cancel, future));
         }
-        let producer = tokio::time::timeout_at(deadline(), started.recv()).await
-            .expect("producer starts").expect("event");
+        let producer = tokio::time::timeout_at(deadline(), started.recv())
+            .await
+            .expect("producer starts")
+            .expect("event");
         producers.push(producer);
         let (_cancel, signal) = cancellation_pair();
-        assert_eq!(resolver.acquire(binding, deadline(), signal).await, Err(CredentialError::Capacity));
+        assert_eq!(
+            resolver.acquire(binding, deadline(), signal).await,
+            Err(CredentialError::Capacity)
+        );
     }
     assert_eq!(resolver.lock().expect("registry").waiters, TOTAL_WAITERS);
     let (_cancel, signal) = cancellation_pair();
-    assert_eq!(resolver.acquire(bindings[4], deadline(), signal).await, Err(CredentialError::Capacity));
+    assert_eq!(
+        resolver.acquire(bindings[4], deadline(), signal).await,
+        Err(CredentialError::Capacity)
+    );
     assert_eq!(counters.calls.load(Ordering::SeqCst), 4);
     drop(pending);
     assert_eq!(resolver.lock().expect("registry").waiters, 0);
@@ -825,7 +900,10 @@ async fn caller_and_producer_deadlines_retire_identity_without_releasing_running
         let waiter = tokio::spawn(async move { owner.acquire(binding, deadline, signal).await });
         let producer = started.recv().await.expect("producer enters");
         tokio::time::advance(Duration::from_secs(advance_seconds)).await;
-        assert_eq!(waiter.await.expect("waiter"), Err(CredentialError::Deadline));
+        assert_eq!(
+            waiter.await.expect("waiter"),
+            Err(CredentialError::Deadline)
+        );
         assert!(producer.cancellation.is_cancelled());
         assert_eq!(counters.running.load(Ordering::SeqCst), 1);
         assert_eq!(resolver.lock().expect("registry").producers.len(), 1);
@@ -835,24 +913,35 @@ async fn caller_and_producer_deadlines_retire_identity_without_releasing_running
     }
     resolver.shutdown(deadline()).await.expect("closed");
     let (_cancel, signal) = cancellation_pair();
-    assert_eq!(resolver.acquire(binding, deadline(), signal).await, Err(CredentialError::Revoked));
+    assert_eq!(
+        resolver.acquire(binding, deadline(), signal).await,
+        Err(CredentialError::Revoked)
+    );
 }
 
 #[tokio::test]
 async fn monotonic_regression_retires_cached_lease_and_active_flight() {
     let (resolver, _counters, mut started, clock, first) = fixture();
     let other_spec = spec(first.spec().profile);
-    resolver.replace_profile(first.spec().profile, &[first.spec(), other_spec]).expect("enroll");
+    resolver
+        .replace_profile(first.spec().profile, &[first.spec(), other_spec])
+        .expect("enroll");
     let first = bind(&resolver, first.spec());
     let other = bind(&resolver, other_spec);
     let lease = install(&resolver, first, &mut started).await;
     let (_cancel, waiter, producer) = start(&resolver, other, &mut started).await;
     clock.set(99, 1001);
-    assert_eq!(resolver.validate_current(first, lease, deadline()), Err(CredentialError::Expiry));
+    assert_eq!(
+        resolver.validate_current(first, lease, deadline()),
+        Err(CredentialError::Expiry)
+    );
     assert_eq!(waiter.await.expect("waiter"), Err(CredentialError::Expiry));
     assert!(producer.cancellation.is_cancelled());
     clock.set(101, 1002);
-    assert_eq!(resolver.validate_current(first, lease, deadline()), Err(CredentialError::Stale));
+    assert_eq!(
+        resolver.validate_current(first, lease, deadline()),
+        Err(CredentialError::Stale)
+    );
     producer.release.send(()).expect("finish");
     wait_count(&resolver, 0).await;
     assert!(resolver.lock().expect("registry").entries.is_empty());
@@ -872,13 +961,19 @@ fn legacy_shared_factory_preview_does_not_require_credential_context() {
                     "api_key": "synthetic-lifecycle-canary"
                 }
             }
-        })).expect("legacy config");
+        }))
+        .expect("legacy config");
         let key = config.api_key().expect("host static admission");
         let provider = build_configured_provider(&config, &key).expect("shared factory");
         let preview = provider.request_preview(&[]).expect("redacted preview");
         assert!(preview.get("error").is_none());
         assert!(!preview.to_string().contains("synthetic-lifecycle-canary"));
-        assert!(preview["url"].as_str().expect("route").starts_with("https://example.com/"));
+        assert!(
+            preview["url"]
+                .as_str()
+                .expect("route")
+                .starts_with("https://example.com/")
+        );
         if protocol == "anthropic-messages" {
             assert!(preview["headers"].get("x-api-key").is_some());
         } else {
@@ -886,7 +981,6 @@ fn legacy_shared_factory_preview_does_not_require_credential_context() {
         }
     }
 }
-
 
 #[tokio::test]
 async fn acquisition_failure_is_shared_without_retry_or_secret_diagnostic() {
@@ -897,14 +991,20 @@ async fn acquisition_failure_is_shared_without_retry_or_secret_diagnostic() {
     assert!(futures_util::poll!(&mut second).is_pending());
     // Closing the fake's exit channel produces a typed acquisition failure.
     drop(producer.release);
-    assert_eq!(first.await.expect("first waiter"), Err(CredentialError::Acquisition));
+    assert_eq!(
+        first.await.expect("first waiter"),
+        Err(CredentialError::Acquisition)
+    );
     let error = second.await.expect_err("shared failure");
     assert_eq!(error, CredentialError::Acquisition);
     assert_eq!(error.to_string(), "credential acquisition failed");
     assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
     wait_count(&resolver, 0).await;
     let lease = install(&resolver, binding, &mut started).await;
-    assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+    assert_eq!(
+        resolver.validate_current(binding, lease, deadline()),
+        Ok(())
+    );
     assert_eq!(counters.calls.load(Ordering::SeqCst), 2);
 }
 
@@ -912,13 +1012,28 @@ async fn acquisition_failure_is_shared_without_retry_or_secret_diagnostic() {
 fn invalid_or_oversized_enrollment_preserves_current_binding() {
     let (resolver, _counters, _started, _clock, binding) = fixture();
     let base = binding.spec();
-    assert_eq!(resolver.replace_profile(base.profile, &[]), Err(CredentialError::Configuration));
-    assert_eq!(resolver.replace_profile(base.profile, &[base, base]), Err(CredentialError::Configuration));
     assert_eq!(
-        resolver.replace_profile(base.profile, &[BindingSpec { profile: Uuid::new_v4(), ..base }]),
+        resolver.replace_profile(base.profile, &[]),
+        Err(CredentialError::Configuration)
+    );
+    assert_eq!(
+        resolver.replace_profile(base.profile, &[base, base]),
+        Err(CredentialError::Configuration)
+    );
+    assert_eq!(
+        resolver.replace_profile(
+            base.profile,
+            &[BindingSpec {
+                profile: Uuid::new_v4(),
+                ..base
+            }]
+        ),
         Err(CredentialError::Configuration)
     );
     let oversized = vec![base; ENROLLED_BINDINGS + 1];
-    assert_eq!(resolver.replace_profile(base.profile, &oversized), Err(CredentialError::Capacity));
+    assert_eq!(
+        resolver.replace_profile(base.profile, &oversized),
+        Err(CredentialError::Capacity)
+    );
     assert!(bind(&resolver, base) == binding);
 }
