@@ -1,6 +1,6 @@
 # Iteration I338: Shared provider credential lease lifecycle
 
-> Document status: Active / Claimed (proposed by #1025; ineffective until target-main merge)
+> Document status: Active / Claimed
 > Published plan date: 2026-11-24
 > Baseline: f61b1fa9e6f9c072af86843be8d050c15086bc39
 > Planned objective: implement ADR-108 B shared lifecycle without changing existing static or dispatch-credential behavior.
@@ -20,8 +20,8 @@
 | Governance Claim PR | #1025 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer delegated B and parallel governance-only claim preparation; main session owns acceptance. Independent protected-scope technical/security review of exact claim head, both validators, applicable CI and merge CAS required; no approval yet. #1021 applies only to #1020 and is not inherited. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-24 |
+| Implementation PR | #1034 |
+| Last Updated | 2026-11-26 |
 | Handoff / Release Condition | No implementation before claim merge; hand C the reviewed lifecycle contract and source/test evidence; maintain #132 open and close B only with existing implementation SHA and independently reviewed acceptance. |
 
 ## Published Baseline
@@ -72,3 +72,22 @@ Board also records independent Review/Active tasks (e.g. DEPENDENCY-003-A, clipb
 ## Verification Evidence / Residuals
 
 Governance CI receipts and review to be appended as PR comments bound to exact head; no fabricated local validator result. Product tests and actual shared resolver unimplemented. Remaining C–G acceptance separate; #132 and #1024 open. No Completion Commit.
+
+### Implementation checkpoint (2026-11-24)
+
+Activated by #1025 merge `2645018339892020b7d01633b8a6f9ad6615c197`. First library source checkpoint on `feat/i338-provider003b-credential-lifecycle`: resolver and deterministic fake-source fixtures. Main session may assist local pinned-toolchain validation; no compile/test result yet. Continue with local formatting, focused tests and review, remaining compatibility and boundary fixtures, then stable implementation PR and exact-head CI. No product enablement or completion.
+
+### First local validation feedback and correction (2026-11-24)
+
+Previous head `2b7a3a6ada1e3deab82b4dcbdd69b198ae8454f4`: pinned 1.99.0 fmt check exit 1, check/test exit 101 (E0308), focused tests executed **0**, Clippy exit 101 including seven pre-existing Azure diagnostics, itemized in B owner and #1024 comment 7134583357. Fix revoked-write fixture argument and isolate synchronous RefreshStore I/O from global registry lock via bounded per-profile reservations and post-I/O generation checks. Added controlled slow-read/write and reentrant store fixtures; admitted writes may complete physically but revoked results cannot succeed; durable store cleanup is external enrollment scope. Local rustfmt unavailable here; main-session formatting and four-command retest required. Do not mark validated, Review or Complete on source alone.
+
+
+### Second local validation and acceptance-gap checkpoint
+
+Maintainer reports local formatted SHA `5113d175fd41c715943846bb98f89c7d5ddc495c`: pinned fmt/check passed, provider focused **12/12 passed**, strict all-targets Clippy exit 101 (95 diagnostics reported in unchanged Azure/Bedrock files). Historical E0308/0-test receipt retained. Remote format-only sync `80fe048b02633cb2f7aa44bc92b54671aa2304cc` verified as child of 753abfb9; local SHA object unavailable remotely, no claim of same exact SHA verification. See B owner acceptance mapping for named tests and remaining gates. Main moved to 262b6ca7 (I324-only changes, no overlap); retain implementation history.
+
+New source checkpoint closes identified implementation/fixture gaps: trusted binding inventory and atomic replacement (64 profiles/256 enrolled specs, subject to review); explicit CredentialContext with shared handles, shutdown and drop cancellation; waiter limits, deterministic timeout, clock regression, acquisition failure and enrollment isolation fixtures; shared factory and CLI/Desktop/SDK static compatibility previews. 20 provider focused test definitions plus 3 host fixtures, not yet executed on this candidate. SDK contract updated; no default runtime or vendor auth change. Need pinned rustfmt, locked focused checks/tests/Clippy, config and host regression suites, workspace/native CI, stable implementation PR with exact-head evidence and independent protected-scope review. Do not mark Complete or close #1024; C and D–G separate.
+
+## Phase three local verification and implementation PR (2026-11-26)
+
+Claim #1025 effective on main at 2645018339892020b7d01633b8a6f9ad6615c197. Implementation PR #1034, independent review required; no completion or merge authorization. Main-session receipt at [#1024 comment 7167456663](https://github.com/wjhuang88/talos/issues/1024#issuecomment-7167456663), tested code SHA `d7102b28d6aa71af39cebf743ffb708554d73dec`, pinned Rust 1.99.0: fmt/check passed; provider credential_lifecycle 20/20; config 309/309; CLI and SDK 2/2. Maintainer supplied the follow-up Desktop output for the requested explicit desktop-ui test: `provider::tests::credential_lifecycle_legacy_static_desktop_preview ... ok`, 1 passed, 0 failed, 0 ignored, 117 filtered out. This is user-reported local execution, not a CI receipt. Strict all-targets Clippy exit 101 with 95 reported existing Azure/Bedrock diagnostics; earlier E0308 and zero executed tests retained. All named provider fixtures in the preceding mapping are covered by the reported 20/20 run; the three static host fixtures and config suite passed as reported. No new product or test changes in this receipt commit. Exact-head CI, workspace/platform results, independent lifecycle/security/API review and merge-time CAS remain outstanding. Main checked at a40a077d23c8d28803844da1bfff90f011ec96d7; activation is its ancestor, no changed-file overlap with B in the comparison, no history rewrite. Keep B In Progress/Active until review gates are satisfied; C/D–G separate, parent and child remain open.

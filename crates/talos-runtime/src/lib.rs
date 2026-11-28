@@ -6413,6 +6413,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn credential_lifecycle_legacy_static_sdk_provider_injection() {
+        let provider = Arc::new(talos_provider::openai::OpenAIProvider::new(
+            "synthetic-i338-host-canary",
+            "fixture-model",
+        ));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .build()
+            .expect("runtime builds without credential context");
+        runtime
+            .preview_request("inspect legacy request")
+            .await
+            .expect("preview");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("completion");
+        match status {
+            TurnCompletionStatus::Success { final_text, .. } => {
+                assert!(final_text.contains("Request preview (no API call made)"));
+                assert!(final_text.contains("inspect legacy request"));
+                assert!(!final_text.contains("synthetic-i338-host-canary"));
+            }
+            other => panic!("unexpected status: {other:?}"),
+        }
+        runtime.shutdown().await.expect("shutdown");
+    }
+
+    #[tokio::test]
     async fn runtime_previews_request_without_submit_magic_string() {
         let provider = Arc::new(MockProvider::new().with_request_debug_builder(|messages| {
             serde_json::to_string(messages).expect("messages serialize")

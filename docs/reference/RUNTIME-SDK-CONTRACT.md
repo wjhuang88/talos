@@ -1151,3 +1151,37 @@ Existing configurations can opt in per provider or per model. SDK consumers
 matching on the non-exhaustive protocol enum should handle the new variant
 and retain a fallback for future variants. See the
 [Bedrock configuration example](PROVIDER-PROTOCOLS.md#amazon-bedrock-conversestream).
+
+
+## Optional provider credential lifecycle context (I338, unreleased)
+
+Embedders using the optional `talos-provider` crate may explicitly own a
+`talos_provider::credential_lifecycle::CredentialContext` for a trusted acquisition adapter.
+This is an additive pre-1.0 provider-library surface, not an implicit
+`RuntimeBuilder` capability or a new user configuration format. Existing injected
+`Arc<dyn LanguageModel>`, configured static provider factories, CLI and Desktop
+static lookup and file persistence keep their current behavior.
+
+Create one context per host/account lifecycle, obtain shared resolver handles
+with `context.resolver()`, and register exact trusted `BindingSpec` entries via
+`replace_profile(profile, &bindings)`. Resolve explicit dynamic selection with
+`bind(spec, SourceSelection::Explicit(...))` before acquisition or store access.
+Enrollment is trusted host input; do not create grants from a repository URL,
+model alias, arbitrary project configuration or helper output. The resolver
+returns opaque leases and checked lifecycle decisions, not a sealed request or
+a vendor login flow. Acquisition and inference audience policy, final transport
+authorization, dispatch/replay and supplier-specific adapters remain C–G.
+
+Call `context.shutdown(deadline).await` before disposing the owning Tokio runtime.
+It closes admission, cancels and waits for actual producer termination; handle
+`ShutdownIncomplete` explicitly rather than assuming cancellation equals exit.
+Dropping the owner closes admission and requests cancellation but cannot perform
+an async join. Other independent contexts are isolated even with identical IDs.
+Use the synchronous refresh-store seam only with an explicitly approved store and
+a blocking-capable execution context. Never persist dynamic access material in
+TOML, history or diagnostics. Revocation cannot roll back an already admitted
+external synchronous write; durable refresh deletion/re-enrollment belongs to
+the store's enrollment flow. `StoreBusy` means wait for that profile's previous
+operation to return; `StoreUnavailable` requires unlocking/configuring an
+approved store, never a silent file fallback. See ADR-108 and the I338 owner for
+bounds, review gates and the C handoff.
