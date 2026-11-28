@@ -17,12 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 6fa907dec9f7587c06dc1c943159cb52c5057c82
+          ref: b79f066bd592d702f6b8170058ba7ca6870944a5
           path: base
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: c7d905bd7a271f9ecd7cdd0a6cd634bbf0eafecf
+          ref: 8bce118c7e397b4ac62dce26725b8b8bcf62f8de
           path: pr
           persist-credentials: false
       - shell: pwsh
@@ -45,5 +45,5 @@ jobs:
               if ($LASTEXITCODE) { $failed = $true }
               Pop-Location
             }
-            if ($failed) { exit 1 }
+          if ($failed) { exit 1 }
           }
