@@ -272,7 +272,15 @@ pub(crate) fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".talos")
         .join("memory.db");
-    let memory_store = Arc::new(StdMutex::new(None::<MemoryStore>));
+    set_memory_provider_for_path(agent, mem_config, memory_db, Arc::new(StdMutex::new(None)));
+}
+
+fn set_memory_provider_for_path(
+    agent: &mut Agent,
+    mem_config: talos_memory::MemoryPromptConfig,
+    memory_db: PathBuf,
+    memory_store: Arc<StdMutex<Option<MemoryStore>>>,
+) {
     let provider = std::sync::Arc::new(move |query: &str| -> Option<String> {
         if !memory_db.exists() {
             tracing::debug!(
@@ -676,6 +684,124 @@ mod tests {
             4096,
             "only the total output reservation changes admission cost"
         );
+    }
+
+    #[tokio::test]
+    async fn e3a_cli_memory_registration_defers_open_until_first_query() {
+        use talos_core::message::Message;
+        use talos_memory::{MemoryItem, MemoryKind};
+
+        let root = tempfile::tempdir().expect("isolated memory fixture");
+        for existing in [false, true] {
+            let home = root
+                .path()
+                .join(if existing { "existing" } else { "missing" });
+            let memory_dir = home.join(".talos");
+            let memory_db = memory_dir.join("memory.db");
+            if existing {
+                std::fs::create_dir_all(&memory_dir).expect("memory directory");
+                std::fs::File::create(&memory_db).expect("empty existing database");
+            }
+
+            let provider =
+                talos_provider::mock::MockProvider::new().with_request_debug_builder(|messages| {
+                    messages
+                        .iter()
+                        .filter_map(|message| match message {
+                            Message::System { content, .. } => Some(content.as_str()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                });
+            let mut agent = Agent::with_security(
+                Arc::new(provider),
+                talos_core::tool::ToolRegistry::new(),
+                Some(Arc::new(talos_permission::PermissionEngine::new())),
+                None,
+                root.path().to_path_buf(),
+            );
+            let memory_store = Arc::new(StdMutex::new(None));
+            set_memory_provider_for_path(
+                &mut agent,
+                talos_memory::MemoryPromptConfig {
+                    enabled: true,
+                    ..Default::default()
+                },
+                memory_db.clone(),
+                Arc::clone(&memory_store),
+            );
+            assert!(memory_store.lock().expect("memory cache").is_none());
+
+            if existing {
+                assert_eq!(
+                    std::fs::metadata(&memory_db).expect("existing file").len(),
+                    0,
+                    "registration must not migrate an existing database"
+                );
+            } else {
+                assert!(!memory_dir.exists(), "registration must not create a store");
+                let preview = agent
+                    .preview_request("orchid".to_string(), vec![])
+                    .await
+                    .expect("query without a store")
+                    .expect("provider request preview");
+                assert!(!preview.contains("## Relevant Memory"));
+                assert!(!memory_dir.exists(), "missing store remains uninitialized");
+                assert!(memory_store.lock().expect("memory cache").is_none());
+                std::fs::create_dir_all(&memory_dir).expect("late memory directory");
+                std::fs::File::create(&memory_db).expect("late empty database");
+            }
+
+            let preview = agent
+                .preview_request("orchid".to_string(), vec![])
+                .await
+                .expect("query opens existing store")
+                .expect("provider request preview");
+            assert!(!preview.contains("## Relevant Memory"));
+            {
+                // Inspect the actual cached connection before any second open can migrate it.
+                let cache = memory_store.lock().expect("memory cache");
+                let store = cache
+                    .as_ref()
+                    .expect("first query opens and migrates store");
+                assert_eq!(store.count().expect("migrated memory table"), 0);
+                assert!(
+                    store
+                        .retrieve("orchid", 1)
+                        .expect("migrated FTS table")
+                        .is_empty()
+                );
+                store.memory_status().expect("migrated memory schema");
+            }
+
+            {
+                let mut store = MemoryStore::open(&memory_db).expect("seed opened store");
+                let now = std::time::SystemTime::now().into();
+                assert!(
+                    store
+                        .insert(MemoryItem {
+                            id: "i334-memory".into(),
+                            kind: MemoryKind::Semantic,
+                            key: "orchid".into(),
+                            content: "orchid configuration is cobalt".into(),
+                            confidence: 0.9,
+                            created_at: now,
+                            last_reinforced: now,
+                            last_accessed: None,
+                            contradiction_ref: None,
+                        })
+                        .expect("insert real memory item")
+                );
+            }
+            let preview = agent
+                .preview_request("orchid".to_string(), vec![])
+                .await
+                .expect("query sees real persisted memory")
+                .expect("provider request preview");
+            assert!(preview.contains("## Relevant Memory"));
+            assert!(preview.contains("orchid configuration is cobalt"));
+        }
     }
 
     #[test]
