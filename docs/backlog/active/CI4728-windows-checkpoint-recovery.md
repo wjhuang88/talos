@@ -13,7 +13,7 @@
 | Work Slice | Diagnose and correct Windows durable checkpoint history preparation and delivery failures in the registered actor test. |
 | Claimed At | 2026-11-28 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #1053 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Pending independent review of this claim. |
 | Implementation PR | Not started |
