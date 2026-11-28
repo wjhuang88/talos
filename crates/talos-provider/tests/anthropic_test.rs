@@ -209,11 +209,17 @@ async fn test_rate_limit_error() {
         .with_status(429)
         .with_header("content-type", "application/json")
         .with_body(r#"{"error":{"message":"rate limited"}}"#)
-        .expect_at_least(1)
+        .expect(6)
         .create();
 
-    let provider =
-        AnthropicProvider::new("test-key", "claude-sonnet-4-20250514").with_base_url(server.url());
+    let provider = AnthropicProvider::new("test-key", "claude-sonnet-4-20250514")
+        .with_base_url(server.url())
+        .with_timeout_config(talos_config::ProviderTimeoutConfig {
+            max_attempts: 5,
+            backoff_base_ms: 1,
+            backoff_max_ms: 1,
+            ..Default::default()
+        });
 
     let messages = vec![Message::User {
         content: "Hello".into(),
@@ -236,11 +242,17 @@ async fn test_server_error() {
         .with_status(500)
         .with_header("content-type", "application/json")
         .with_body(r#"{"error":{"message":"internal error"}}"#)
-        .expect_at_least(1)
+        .expect(6)
         .create();
 
-    let provider =
-        AnthropicProvider::new("test-key", "claude-sonnet-4-20250514").with_base_url(server.url());
+    let provider = AnthropicProvider::new("test-key", "claude-sonnet-4-20250514")
+        .with_base_url(server.url())
+        .with_timeout_config(talos_config::ProviderTimeoutConfig {
+            max_attempts: 5,
+            backoff_base_ms: 1,
+            backoff_max_ms: 1,
+            ..Default::default()
+        });
 
     let messages = vec![Message::User {
         content: "Hello".into(),
