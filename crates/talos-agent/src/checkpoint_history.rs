@@ -862,6 +862,7 @@ impl History {
             let seal = self.seal.lock().ok()?;
             seal.check_current().ok()?;
             let result = read(&seal)?;
+            seal.check_current().ok()?;
             (!self.cancel.is_cancelled() && Instant::now() < deadline).then_some(result)
         }
     }
@@ -923,14 +924,25 @@ impl History {
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
-        self.current_until(deadline)
-            && SessionIndex::open_read_only(&self.path)
+        let index_ready = || {
+            SessionIndex::open_read_only(&self.path)
                 .ok()
                 .is_some_and(|mut index| {
                     index
                         .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
                         .unwrap_or(false)
                 })
+        };
+        // A Windows seal holds the restrictive file handle for the entire
+        // callback. Verify the captured prefix once around the index read.
+        #[cfg(windows)]
+        if self.archive.is_none() {
+            return self
+                .with_seal(deadline, |_| index_ready().then_some(()))
+                .is_some();
+        }
+        self.current_until(deadline)
+            && index_ready()
             && self.current_until(deadline)
             && Instant::now() < deadline
     }
@@ -966,23 +978,24 @@ impl History {
             RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
                 stopped.is_cancelled()
             });
-        if !self.current_until(deadline) {
-            return None;
-        }
         let mut index = SessionIndex::open_read_only(&self.path).ok()?;
-        if !index
-            .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
-            .ok()?
-        {
-            return None;
-        }
         if let Some(evidence) = &self.archive {
+            if !self.current_until(deadline)
+                || !index
+                    .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
+                    .ok()?
+            {
+                return None;
+            }
             let result = self.query_archive(evidence, query, reference, cursor, deadline)?;
             return (self.available_until(deadline)
                 && serde_json::to_vec(&result).ok()?.len() <= 16_384)
                 .then_some(result);
         }
         let result = self.with_seal(deadline, |seal| {
+            if !index.recovery_owner_scope_ready(&self.owner, &self.scope, &budget).ok()? {
+                return None;
+            }
             let mut state = self.state.lock().ok()?;
             let result = if let Some(reference) = reference {
                 if cursor.is_some() {
@@ -1066,15 +1079,8 @@ impl History {
                     .map(|token| (token.clone(), query.to_owned(), last));
                 json!({"status":"Ready","results":results,"complete":!incomplete,"next_cursor":next})
             };
-            Some(result)
+            index.recovery_owner_scope_ready(&self.owner, &self.scope, &budget).ok()?.then_some(result)
         })?;
-        if !self.current_until(deadline)
-            || !index
-                .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
-                .ok()?
-        {
-            return None;
-        }
         (serde_json::to_vec(&result).ok()?.len() <= 16_384).then_some(result)
     }
     fn query_archive(
