@@ -7115,6 +7115,11 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             _ => None,
                         })
                         .expect("old user search result");
+                    eprintln!(
+                        "I338_CHECKPOINT_PHASE provider_step={step} user_search_error={} unavailable={}",
+                        user_result.is_error,
+                        user_result.content == "history/checkpoint execution unavailable",
+                    );
                     assert!(!user_result.is_error, "{}", user_result.content);
                     let user_found: serde_json::Value =
                         serde_json::from_str(&user_result.content).expect("user search JSON");
@@ -7808,6 +7813,92 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             task.is_finished(),
         )
     });
+    // Diagnostic only: log metadata, never the Debug representation of events.
+    // Capture the same observations on successful and unsuccessful runs.
+    eprintln!(
+        "I338_CHECKPOINT_CAPTURE events={} provider_step={} verification_calls={} actor_finished={}",
+        captured.len(),
+        model.step.load(Ordering::SeqCst),
+        verification_calls.load(Ordering::SeqCst),
+        task.is_finished(),
+    );
+    for (index, event) in captured.iter().enumerate() {
+        let kind = match event {
+            SessionEvent::AutomaticCompactStatus { .. } => "AutomaticCompactStatus",
+            SessionEvent::ModelCheckpointTerminal { .. } => "ModelCheckpointTerminal",
+            SessionEvent::CompactStatus { .. } => "CompactStatus",
+            SessionEvent::SubmissionContextBudget { .. } => "SubmissionContextBudget",
+            SessionEvent::BackgroundJobTerminal { .. } => "BackgroundJobTerminal",
+            SessionEvent::SubmissionQueued { .. } => "SubmissionQueued",
+            SessionEvent::SubmissionStarted { .. } => "SubmissionStarted",
+            SessionEvent::StructuredSubmissionStarted { .. } => "StructuredSubmissionStarted",
+            SessionEvent::StructuredSubmissionInjected { .. } => "StructuredSubmissionInjected",
+            SessionEvent::SubmissionRejected { .. } => "SubmissionRejected",
+            SessionEvent::SubmissionPaused { .. } => "SubmissionPaused",
+            SessionEvent::SubmissionResolved { .. } => "SubmissionResolved",
+            SessionEvent::SubmissionReceipt { .. } => "SubmissionReceipt",
+            SessionEvent::StructuredTurnEvent { .. } => "StructuredTurnEvent",
+            SessionEvent::EntriesCommitted { .. } => "EntriesCommitted",
+            SessionEvent::TurnEvent { .. } => "TurnEvent",
+            SessionEvent::AgentEvent { .. } => "AgentEvent",
+            SessionEvent::ApprovalRequired { .. } => "ApprovalRequired",
+            SessionEvent::TurnStarted { .. } => "TurnStarted",
+            SessionEvent::TurnCompleted { .. } => "TurnCompleted",
+            SessionEvent::Error { .. } => "Error",
+            #[allow(unreachable_patterns)]
+            _ => "Other",
+        };
+        eprintln!("I338_CHECKPOINT_EVENT index={index} kind={kind}");
+        match event {
+            SessionEvent::TurnEvent { payload, .. }
+            | SessionEvent::StructuredTurnEvent { payload, .. } => match payload {
+                TurnEventPayload::Started => {
+                    eprintln!("I338_CHECKPOINT_TURN index={index} kind=Started");
+                }
+                TurnEventPayload::Progress { event } => {
+                    eprintln!(
+                        "I338_CHECKPOINT_PROGRESS index={index} agent_kind={:?}",
+                        std::mem::discriminant(event),
+                    );
+                }
+                TurnEventPayload::Completed { status } => {
+                    let kind = match status {
+                        TurnCompletionStatus::Success { .. } => "Success",
+                        TurnCompletionStatus::Cancelled => "Cancelled",
+                        TurnCompletionStatus::Error { .. } => "Error",
+                    };
+                    eprintln!("I338_CHECKPOINT_TURN index={index} terminal={kind}");
+                }
+                #[allow(unreachable_patterns)]
+                _ => eprintln!("I338_CHECKPOINT_TURN index={index} kind=Other"),
+            },
+            SessionEvent::ModelCheckpointTerminal {
+                operation_id,
+                outcome,
+                ..
+            } => {
+                // CompactOutcome contains only counters and typed reasons.
+                eprintln!(
+                    "I338_CHECKPOINT_OUTCOME index={index} operation={operation_id} outcome={outcome:?}",
+                );
+            }
+            SessionEvent::TurnCompleted { status, .. } => {
+                let kind = match status {
+                    TurnCompletionStatus::Success { .. } => "Success",
+                    TurnCompletionStatus::Cancelled => "Cancelled",
+                    TurnCompletionStatus::Error { .. } => "Error",
+                };
+                eprintln!("I338_CHECKPOINT_TURN index={index} terminal={kind}");
+            }
+            SessionEvent::AgentEvent { event } => {
+                eprintln!(
+                    "I338_CHECKPOINT_PROGRESS index={index} agent_kind={:?}",
+                    std::mem::discriminant(event),
+                );
+            }
+            _ => {}
+        }
+    }
     assert!(captured.iter().any(|event| matches!(
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })
