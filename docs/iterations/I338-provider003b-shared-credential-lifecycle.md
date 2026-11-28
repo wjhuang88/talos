@@ -76,3 +76,7 @@ Governance CI receipts and review to be appended as PR comments bound to exact h
 ### Implementation checkpoint (2026-11-24)
 
 Activated by #1025 merge `2645018339892020b7d01633b8a6f9ad6615c197`. First library source checkpoint on `feat/i338-provider003b-credential-lifecycle`: resolver and deterministic fake-source fixtures. Main session may assist local pinned-toolchain validation; no compile/test result yet. Continue with local formatting, focused tests and review, remaining compatibility and boundary fixtures, then stable implementation PR and exact-head CI. No product enablement or completion.
+
+### First local validation feedback and correction (2026-11-24)
+
+Previous head `2b7a3a6ada1e3deab82b4dcbdd69b198ae8454f4`: pinned 1.99.0 fmt check exit 1, check/test exit 101 (E0308), focused tests executed **0**, Clippy exit 101 including seven pre-existing Azure diagnostics, itemized in B owner and #1024 comment 7134583357. Fix revoked-write fixture argument and isolate synchronous RefreshStore I/O from global registry lock via bounded per-profile reservations and post-I/O generation checks. Added controlled slow-read/write and reentrant store fixtures; admitted writes may complete physically but revoked results cannot succeed; durable store cleanup is external enrollment scope. Local rustfmt unavailable here; main-session formatting and four-command retest required. Do not mark validated, Review or Complete on source alone.

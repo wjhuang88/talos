@@ -1,6 +1,6 @@
 //! Provider-neutral dynamic credential lifecycle. No transport, vendor login or config schema.
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt,
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -49,6 +49,9 @@ pub enum CredentialError {
     /// Explicit persistent enrollment requires an available approved store.
     #[error("credential store unavailable; unlock or configure an approved store")]
     StoreUnavailable,
+    /// Another store operation for this profile is still in progress.
+    #[error("credential store operation busy; retry after it completes")]
+    StoreBusy,
     /// A shutdown deadline elapsed before all producers exited.
     #[error("credential resolver shutdown incomplete")]
     ShutdownIncomplete,
@@ -231,6 +234,12 @@ impl RefreshMaterial {
 
 /// Approved OS-store boundary; no filesystem fallback is supplied by this crate.
 /// Implementations must be explicitly enrolled and return only redacted errors.
+/// This synchronous seam may block: callers must use a blocking-capable execution context.
+/// Writes already admitted before revocation may finish in the external store; the resolver
+/// cannot roll back that effect. Durable refresh deletion and re-enrollment are separate
+/// vendor/enrollment responsibilities, not access-lease revocation. A replacement enrollment
+/// must use a new source identity or explicitly clean up the previous durable entry; this seam
+/// does not automatically reload or erase persisted refresh material.
 pub trait RefreshStore: Send + Sync {
     /// Read enrolled refresh material.
     fn read(&self, binding: BindingSpec) -> Result<RefreshMaterial>;
@@ -316,6 +325,9 @@ struct State {
     sequence: u64,
     last_monotonic: Option<Duration>,
     profiles: HashMap<Uuid, u64>,
+    // One admitted synchronous store operation per profile, including revoked profiles
+    // until the actual operation returns. Never held as a mutex across store code.
+    store_operations: HashSet<Uuid>,
     entries: HashMap<Binding, Entry>,
     // Includes retired flights until their actual producer task has joined.
     producers: HashMap<u64, watch::Sender<bool>>,
@@ -389,6 +401,7 @@ impl CredentialResolver {
                 sequence: 0,
                 last_monotonic: None,
                 profiles: HashMap::new(),
+                store_operations: HashSet::new(),
                 entries: HashMap::new(),
                 producers: HashMap::new(),
                 waiters: 0,
@@ -458,20 +471,61 @@ impl CredentialResolver {
         Ok(binding)
     }
 
-    /// Read from an explicitly selected approved store, after binding validation.
-    /// No fallback, UI prompt or file persistence. Call only in an enrolled storage flow.
-    pub fn read_refresh(&self, binding: Binding, store: &dyn RefreshStore) -> Result<RefreshMaterial> {
+    // Admission and result publication are generation-checked under the registry lock.
+    // External code runs without that lock. A per-profile reservation prevents reentrant
+    // or concurrent operations against the same persistent enrollment, without making
+    // revoke/replace or other lease operations wait for synchronous I/O.
+    fn store_operation<T>(
+        &self,
+        binding: Binding,
+        operation: impl FnOnce() -> Result<T>,
+    ) -> Result<T> {
+        {
+            let mut state = self.lock()?;
+            self.check(&state, binding)?;
+            if state.store_operations.contains(&binding.spec.profile) {
+                return Err(CredentialError::StoreBusy);
+            }
+            if state.store_operations.len() >= SLOTS {
+                return Err(CredentialError::Capacity);
+            }
+            state.store_operations.insert(binding.spec.profile);
+        }
+        let _reservation = StoreReservation {
+            resolver: self,
+            profile: binding.spec.profile,
+        };
+        let result = operation().map_err(|_| CredentialError::StoreUnavailable);
         let state = self.lock()?;
         self.check(&state, binding)?;
-        store.read(binding.spec).map_err(|_| CredentialError::StoreUnavailable)
+        result
+    }
+
+    /// Read from an explicitly selected approved store, after binding validation.
+    /// No fallback, UI prompt or file persistence. A read racing revocation is
+    /// discarded and returns Revoked. Another operation for this profile returns StoreBusy.
+    pub fn read_refresh(
+        &self,
+        binding: Binding,
+        store: &dyn RefreshStore,
+    ) -> Result<RefreshMaterial> {
+        self.store_operation(binding, || store.read(binding.spec))
     }
 
     /// Write explicitly enrolled refresh material to an approved store only.
     /// No fallback or silent downgrade if the store is unavailable.
-    pub fn write_refresh(&self, binding: Binding, store: &dyn RefreshStore, material: &RefreshMaterial) -> Result<()> {
-        let state = self.lock()?;
-        self.check(&state, binding)?;
-        material.with_bytes(|bytes| store.write(binding.spec, bytes)).map_err(|_| CredentialError::StoreUnavailable)
+    /// An already admitted write may physically finish after revocation; its result
+    /// is rejected, not rolled back. A new generation cannot enter this profile's
+    /// store until the old operation returns. Durable enrollment cleanup is external.
+    pub fn write_refresh(
+        &self,
+        binding: Binding,
+        store: &dyn RefreshStore,
+        material: &RefreshMaterial,
+    ) -> Result<()> {
+        self.store_operation(binding, || {
+            material.with_bytes(|bytes| store.write(binding.spec, bytes))
+        })
     }
 
     /// Acquire a cached or single-flight lease. Dropping the future detaches the waiter.
@@ -688,6 +742,19 @@ impl CredentialResolver {
 pub fn cancellation_pair() -> (watch::Sender<bool>, Cancellation) {
     let (sender, receiver) = watch::channel(false);
     (sender, Cancellation(receiver))
+}
+
+struct StoreReservation<'a> {
+    resolver: &'a CredentialResolver,
+    profile: Uuid,
+}
+
+impl Drop for StoreReservation<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.resolver.lock() {
+            state.store_operations.remove(&self.profile);
+        }
+    }
 }
 
 struct Waiter {

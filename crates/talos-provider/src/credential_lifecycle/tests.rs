@@ -321,7 +321,7 @@ async fn storage_unavailable_and_material_redaction() {
     assert_eq!(format!("{lease:?}"), "LeaseRef(<opaque>)");
     assert_eq!(resolver.with_current_credential(binding, lease, deadline(), |bytes| bytes == CANARY), Ok(true));
     resolver.revoke_profile(binding.spec().profile).expect("revoke");
-    assert_eq!(resolver.write_refresh(binding, &store, &secret), Err(CredentialError::Revoked));
+    assert_eq!(resolver.write_refresh(binding, &store, &refresh), Err(CredentialError::Revoked));
     assert_eq!(store.0.load(Ordering::SeqCst), 2);
 }
 
@@ -379,4 +379,182 @@ fn omitted_auth_keeps_legacy_inline_precedence_and_redaction() {
         "provider": "fixture-static", "model": "fixture"
     })).expect("legacy config");
     assert!(missing.api_key().is_err());
+}
+
+
+// The blocking store uses entry/exit channels instead of sleeps. Both store I/O and
+// lock-sensitive probes run on blocking threads so a regression cannot freeze the
+// current-thread Tokio test runtime and defeat its timeout.
+struct SlowStore {
+    entered: Mutex<Option<oneshot::Sender<()>>>,
+    release: Mutex<std::sync::mpsc::Receiver<()>>,
+    reads: AtomicUsize,
+    writes: AtomicUsize,
+}
+
+impl SlowStore {
+    fn hold(&self) -> Result<()> {
+        self.entered
+            .lock()
+            .expect("entry lock")
+            .take()
+            .expect("one admitted operation")
+            .send(())
+            .map_err(|_| CredentialError::Acquisition)?;
+        self.release
+            .lock()
+            .expect("release lock")
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|_| CredentialError::Deadline)
+    }
+}
+
+impl RefreshStore for SlowStore {
+    fn read(&self, _binding: BindingSpec) -> Result<RefreshMaterial> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        self.hold()?;
+        RefreshMaterial::new(CANARY)
+    }
+
+    fn write(&self, _binding: BindingSpec, _material: &[u8]) -> Result<()> {
+        self.hold()?;
+        self.writes.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn slow_refresh_store_does_not_hold_registry_and_revocation_rejects_late_result() {
+    for write in [false, true] {
+        let (resolver, _counters, mut started, _clock, binding) = fixture();
+        let old = install(&resolver, binding, &mut started).await;
+        let other_spec = spec(Uuid::new_v4());
+        resolver.replace_profile(other_spec.profile).expect("enroll other");
+        let other = bind(&resolver, other_spec);
+        let (entered_tx, entered_rx) = oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let store = Arc::new(SlowStore {
+            entered: Mutex::new(Some(entered_tx)),
+            release: Mutex::new(release_rx),
+            reads: AtomicUsize::new(0),
+            writes: AtomicUsize::new(0),
+        });
+
+        let task = {
+            let resolver = Arc::clone(&resolver);
+            let store = Arc::clone(&store);
+            tokio::task::spawn_blocking(move || {
+                if write {
+                    let refresh = RefreshMaterial::new(CANARY).expect("material");
+                    resolver.write_refresh(binding, store.as_ref(), &refresh)
+                } else {
+                    resolver.read_refresh(binding, store.as_ref()).map(drop)
+                }
+            })
+        };
+        tokio::time::timeout(Duration::from_secs(3), entered_rx)
+            .await
+            .expect("store entered before timeout")
+            .expect("entry signal");
+
+        // This must complete while the first store is still deliberately held.
+        let probe = {
+            let resolver = Arc::clone(&resolver);
+            tokio::task::spawn_blocking(move || {
+                let store = FakeStore::default();
+                let refresh = RefreshMaterial::new(CANARY).expect("material");
+                assert!(matches!(
+                    resolver.read_refresh(binding, &store),
+                    Err(CredentialError::StoreBusy)
+                ));
+                assert_eq!(
+                    resolver.write_refresh(binding, &store, &refresh),
+                    Err(CredentialError::StoreBusy)
+                );
+                assert_eq!(store.0.load(Ordering::SeqCst), 0);
+                resolver.revoke_profile(binding.spec().profile).expect("revoke");
+                assert_eq!(
+                    resolver.validate_current(binding, old, deadline()),
+                    Err(CredentialError::Revoked)
+                );
+                assert!(matches!(
+                    resolver.read_refresh(binding, &store),
+                    Err(CredentialError::Revoked)
+                ));
+                resolver.replace_profile(binding.spec().profile).expect("replace");
+                let replacement = bind(&resolver, binding.spec());
+                assert!(matches!(
+                    resolver.read_refresh(replacement, &store),
+                    Err(CredentialError::StoreBusy)
+                ));
+                assert_eq!(store.0.load(Ordering::SeqCst), 0);
+                replacement
+            })
+        };
+        let replacement = tokio::time::timeout(Duration::from_secs(3), probe)
+            .await
+            .expect("revocation and replacement must not wait for store")
+            .expect("probe joined");
+
+        // Exercise a real independent acquisition and dispatch-admission check,
+        // not merely a try_lock, before releasing the slow store.
+        let other_lease = install(&resolver, other, &mut started).await;
+        assert_eq!(
+            resolver.validate_current(other, other_lease, deadline()),
+            Ok(())
+        );
+        release_tx.send(()).expect("release slow store");
+        assert_eq!(task.await.expect("store joined"), Err(CredentialError::Revoked));
+        assert_eq!(store.reads.load(Ordering::SeqCst), if write { 0 } else { 1 });
+        // A write admitted before revoke can physically complete: Revoked is
+        // not an external-store rollback. No old lease or successful read is returned.
+        assert_eq!(store.writes.load(Ordering::SeqCst), if write { 1 } else { 0 });
+        assert!(resolver.lock().expect("state").store_operations.is_empty());
+        let fake = FakeStore::default();
+        assert!(matches!(
+            resolver.read_refresh(replacement, &fake),
+            Err(CredentialError::StoreUnavailable)
+        ));
+        assert_eq!(fake.0.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+fn store_callback_can_reenter_registry_without_deadlocking() {
+    struct ReentrantStore<'a> {
+        resolver: &'a CredentialResolver,
+        binding: Binding,
+    }
+
+    impl RefreshStore for ReentrantStore<'_> {
+        fn read(&self, _binding: BindingSpec) -> Result<RefreshMaterial> {
+            // Same-profile reentry must fail before calling the nested store.
+            let nested = FakeStore::default();
+            assert!(matches!(
+                self.resolver.read_refresh(self.binding, &nested),
+                Err(CredentialError::StoreBusy)
+            ));
+            assert_eq!(nested.0.load(Ordering::SeqCst), 0);
+            self.resolver.revoke_profile(self.binding.spec().profile)?;
+            RefreshMaterial::new(CANARY)
+        }
+
+        fn write(&self, _binding: BindingSpec, _material: &[u8]) -> Result<()> {
+            Err(CredentialError::Acquisition)
+        }
+    }
+
+    let (resolver, _counters, _started, _clock, binding) = fixture();
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let store = ReentrantStore { resolver: &resolver, binding };
+        assert!(matches!(
+            resolver.read_refresh(binding, &store),
+            Err(CredentialError::Revoked)
+        ));
+        assert!(resolver.lock().expect("state").store_operations.is_empty());
+        done_tx.send(()).expect("completion");
+    });
+    done_rx.recv_timeout(Duration::from_secs(3)).expect("reentry must not deadlock");
+    worker.join().expect("worker joined");
 }
