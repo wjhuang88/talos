@@ -1078,7 +1078,6 @@ fn invalid_or_oversized_enrollment_preserves_current_binding() {
     assert!(bind(&resolver, base) == binding);
 }
 
-
 // Run the synchronous registry/clock section on a blocking worker entered into
 // the same paused Tokio runtime. The test thread can advance its clock or cancel
 // after sample entry, while the worker still owns the registry gate.
@@ -1140,7 +1139,10 @@ async fn acquire_admission_race(cached: bool) {
         assert_eq!(counters.calls.load(Ordering::SeqCst), calls);
         assert!(started.try_recv().is_err());
         if let Some(lease) = existing {
-            assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+            assert_eq!(
+                resolver.validate_current(binding, lease, deadline()),
+                Ok(())
+            );
         }
         resolver.shutdown(deadline()).await.expect("shutdown");
         assert_eq!(counters.calls.load(Ordering::SeqCst), calls);
@@ -1187,7 +1189,10 @@ async fn acquire_rechecks_terminal_caller_during_final_lease_validation() {
             .acquire(binding, deadline(), signal)
             .await
             .expect("published lease remains usable for another caller");
-        assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+        assert_eq!(
+            resolver.validate_current(binding, lease, deadline()),
+            Ok(())
+        );
         assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
         resolver.shutdown(deadline()).await.expect("shutdown");
     }
@@ -1216,9 +1221,15 @@ async fn current_rechecks_deadline_before_validation_or_secret_access() {
         };
         let (cancel, _signal) = cancellation_pair();
         terminate_at_sample(entered, release, &cancel, CredentialError::Deadline).await;
-        assert_eq!(worker.await.expect("validation joined"), Err(CredentialError::Deadline));
+        assert_eq!(
+            worker.await.expect("validation joined"),
+            Err(CredentialError::Deadline)
+        );
         assert_eq!(consumed.load(Ordering::SeqCst), 0);
-        assert_eq!(resolver.validate_current(binding, lease, deadline()), Ok(()));
+        assert_eq!(
+            resolver.validate_current(binding, lease, deadline()),
+            Ok(())
+        );
         assert_eq!(counters.calls.load(Ordering::SeqCst), 1);
     }
     resolver.shutdown(deadline()).await.expect("shutdown");
