@@ -17,12 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: b79f066bd592d702f6b8170058ba7ca6870944a5
+          ref: 4f9b5143fe0aaca1078a71fbd19f0838e340ccad
           path: base
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: 8bce118c7e397b4ac62dce26725b8b8bcf62f8de
+          ref: a39181fa4eb291675e3565f85f6d342d6b39ff81
           path: pr
           persist-credentials: false
       - shell: pwsh
