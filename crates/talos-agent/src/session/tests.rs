@@ -4605,7 +4605,7 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
     );
 
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let _actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -4615,7 +4615,8 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         .await
         .expect("operation should succeed");
 
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
 
     let has_error_completion = events.iter().any(|e| {
         matches!(
@@ -4809,7 +4810,7 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     );
 
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let _actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -4827,7 +4828,8 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     std::fs::remove_dir_all(&session_parent).expect("remove session parent");
     std::fs::write(&session_parent, "not a directory").expect("block session parent");
     release.notify_one();
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
 
     let error_message = events.iter().find_map(|e| match completed_status(e) {
         Some(TurnCompletionStatus::Error { message }) => Some(message.clone()),
@@ -4883,7 +4885,7 @@ async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
     actor.set_durable_persistence(durable, PersistencePolicy::default());
 
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let _actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -4893,7 +4895,8 @@ async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
         .await
         .expect("operation should succeed");
 
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
 
     let has_error = events.iter().any(|e| {
         matches!(
@@ -4979,7 +4982,8 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
     .await
     .expect("tool result timeout");
     sq_tx.send(SessionOp::Interrupt).await.expect("interrupt");
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
     assert!(events.iter().any(|event| {
         matches!(
             completed_status(event),
