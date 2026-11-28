@@ -107,3 +107,7 @@ After claim: locked targeted tests and cargo check/clippy/test --workspace --loc
 ## Verification receipt
 
 Source inspection and arithmetic model above are complete for inspected files. Local checkout attempt failed DNS (git ls-remote github.com could not resolve host); no local full-repository validators or Rust tests claimed. Existing GitHub CI must execute the unmodified governance scripts on exact final head; preserve failure/skip/job logs in PR comments. Full cross-host fixture and native clock/cancellation evidence pending B implementation; exact claim review/CI and CAS pending. No implementation PR or Completion Commit.
+
+## Implementation checkpoint (2026-11-24)
+
+Claim #1025 effective on main `2645018339892020b7d01633b8a6f9ad6615c197`. Implementation branch `feat/i338-provider003b-credential-lifecycle`. Library-only first checkpoint: provider-neutral resolver and synthetic lifecycle fixtures in `crates/talos-provider/src/credential_lifecycle.rs` and its tests module. Existing static configuration and adapters unchanged; C owns final transport admission integration and D–G vendor acquisition. This is a source checkpoint, not an accepted or compiled candidate. Local checkout failed DNS and no Rust toolchain is available in the execution environment. Maintainer authorized main-session local validation assistance; rustfmt, locked targeted checks, broader fixture coverage, locked workspace/native CI, security review and docs remain outstanding. No claim status change, no Completion Commit.

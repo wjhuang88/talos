@@ -72,3 +72,7 @@ Board also records independent Review/Active tasks (e.g. DEPENDENCY-003-A, clipb
 ## Verification Evidence / Residuals
 
 Governance CI receipts and review to be appended as PR comments bound to exact head; no fabricated local validator result. Product tests and actual shared resolver unimplemented. Remaining C–G acceptance separate; #132 and #1024 open. No Completion Commit.
+
+### Implementation checkpoint (2026-11-24)
+
+Activated by #1025 merge `2645018339892020b7d01633b8a6f9ad6615c197`. First library source checkpoint on `feat/i338-provider003b-credential-lifecycle`: resolver and deterministic fake-source fixtures. Main session may assist local pinned-toolchain validation; no compile/test result yet. Continue with local formatting, focused tests and review, remaining compatibility and boundary fixtures, then stable implementation PR and exact-head CI. No product enablement or completion.

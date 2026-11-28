@@ -24,6 +24,8 @@ mod bedrock_response;
 mod bedrock_stream;
 mod bedrock_transport;
 mod copilot;
+/// Shared provider-neutral credential lifecycle for explicit host contexts.
+pub mod credential_lifecycle;
 mod gemini_auth;
 mod gemini_compat;
 mod gemini_endpoint;
