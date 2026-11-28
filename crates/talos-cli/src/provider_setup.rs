@@ -126,6 +126,19 @@ mod tests {
     }
 
     #[test]
+    fn credential_lifecycle_legacy_static_cli_preview() {
+        let mut config = openai_o3_config(None);
+        config.providers.entry("openai".into()).or_default().api_key =
+            Some("synthetic-i338-host-canary".into());
+        let key = config.api_key().expect("legacy inline key");
+        assert_eq!(key, "synthetic-i338-host-canary");
+        let provider = build_provider(&config, &key, false).expect("configured provider");
+        let preview = provider.request_preview(&[]).expect("preview");
+        assert!(preview["headers"].get("Authorization").is_some());
+        assert!(!preview.to_string().contains(key.as_str()));
+    }
+
+    #[test]
     fn provider_build_materializes_variant_reasoning_into_real_request() {
         let config = openai_o3_config(Some("high-reasoning"));
         assert_eq!(

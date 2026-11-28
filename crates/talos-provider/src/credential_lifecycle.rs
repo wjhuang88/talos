@@ -9,6 +9,8 @@ use tokio::{sync::watch, time::Instant};
 use uuid::Uuid;
 
 const SLOTS: usize = 64;
+// Enrollment metadata is separate from the 64 live lease slots.
+const ENROLLED_BINDINGS: usize = 256;
 const PRODUCERS: usize = 16;
 const PER_KEY_WAITERS: usize = 64;
 const TOTAL_WAITERS: usize = 256;
@@ -131,7 +133,8 @@ pub struct ClockSample {
     pub wall: Duration,
 }
 
-/// Injectable clock; invalid readings must return a redacted error.
+/// Trusted injectable clock; invalid readings must return a redacted error.
+/// Sampling runs under the registry gate and must be fast, nonblocking and non-reentrant.
 pub trait CredentialClock: Send + Sync {
     /// Sample both clocks.
     fn sample(&self) -> Result<ClockSample>;
@@ -330,11 +333,16 @@ enum Entry {
     Cached(LeaseRef, CredentialMaterial),
 }
 
+struct Enrollment {
+    generation: u64,
+    bindings: HashSet<BindingSpec>,
+}
+
 struct State {
     closed: bool,
     sequence: u64,
     last_monotonic: Option<Duration>,
-    profiles: HashMap<Uuid, u64>,
+    profiles: HashMap<Uuid, Enrollment>,
     // One admitted synchronous store operation per profile, including revoked profiles
     // until the actual operation returns. Never held as a mutex across store code.
     store_operations: HashSet<Uuid>,
@@ -370,8 +378,7 @@ impl State {
 
     fn observe(&mut self, now: ClockSample) -> Result<ClockSample> {
         if self.last_monotonic.is_some_and(|last| now.monotonic < last) {
-            self.entries
-                .retain(|_, entry| matches!(entry, Entry::Flight(_)));
+            self.retire_all(CredentialError::Expiry);
             return Err(CredentialError::Expiry);
         }
         self.last_monotonic = Some(now.monotonic);
@@ -379,11 +386,59 @@ impl State {
         Ok(now)
     }
 
+    fn retire_all(&mut self, error: CredentialError) {
+        let keys: Vec<_> = self.entries.keys().copied().collect();
+        for key in keys {
+            self.retire(key, error);
+        }
+    }
+
     fn prune(&mut self, now: ClockSample) {
         self.entries.retain(|_, entry| match entry {
             Entry::Flight(_) => true,
             Entry::Cached(lease, _) => lease.expiry.usable(now),
         });
+    }
+}
+
+/// Explicit owner of one provider credential lifecycle for a host or SDK composition.
+/// Share resolver handles among the providers of this context, not across independent
+/// hosts. No default RuntimeBuilder, config or vendor route is changed.
+pub struct CredentialContext {
+    resolver: Arc<CredentialResolver>,
+}
+
+impl CredentialContext {
+    /// Create a lifecycle owner with a trusted acquisition adapter and system clock.
+    pub fn new(source: Arc<dyn CredentialSource>) -> Self {
+        Self {
+            resolver: CredentialResolver::new(source),
+        }
+    }
+
+    /// Create a lifecycle owner with an injected clock.
+    pub fn with_clock(source: Arc<dyn CredentialSource>, clock: Arc<dyn CredentialClock>) -> Self {
+        Self {
+            resolver: CredentialResolver::with_clock(source, clock),
+        }
+    }
+
+    /// Share the same resolver with a provider in this host context.
+    pub fn resolver(&self) -> Arc<CredentialResolver> {
+        Arc::clone(&self.resolver)
+    }
+
+    /// Close admission and await producer termination; call before shutting down the runtime.
+    pub async fn shutdown(&self, deadline: Instant) -> Result<()> {
+        self.resolver.shutdown(deadline).await
+    }
+}
+
+impl Drop for CredentialContext {
+    fn drop(&mut self) {
+        // Drop can revoke and request cancellation, but cannot join an async producer.
+        // The explicit shutdown method is the normal bounded lifecycle gate.
+        let _ = self.resolver.close();
     }
 }
 
@@ -398,13 +453,11 @@ pub struct CredentialResolver {
 }
 
 impl CredentialResolver {
-    /// Create a resolver with the system clock.
-    pub fn new(source: Arc<dyn CredentialSource>) -> Arc<Self> {
+    fn new(source: Arc<dyn CredentialSource>) -> Arc<Self> {
         Self::with_clock(source, Arc::new(SystemClock(std::time::Instant::now())))
     }
 
-    /// Create a resolver with an injected clock.
-    pub fn with_clock(
+    fn with_clock(
         source: Arc<dyn CredentialSource>,
         clock: Arc<dyn CredentialClock>,
     ) -> Arc<Self> {
@@ -430,19 +483,42 @@ impl CredentialResolver {
         self.state.lock().map_err(|_| CredentialError::Unavailable)
     }
 
+    fn observe_clock(&self, state: &mut State) -> Result<ClockSample> {
+        match self.clock.sample() {
+            Ok(now) => state.observe(now),
+            Err(_) => {
+                state.retire_all(CredentialError::Expiry);
+                Err(CredentialError::Expiry)
+            }
+        }
+    }
+
     fn check(&self, state: &State, binding: Binding) -> Result<()> {
         if state.closed
             || binding.context != self.identity
-            || state.profiles.get(&binding.spec.profile) != Some(&binding.generation)
+            || !state.profiles.get(&binding.spec.profile).is_some_and(|profile| {
+                profile.generation == binding.generation && profile.bindings.contains(&binding.spec)
+            })
         {
             return Err(CredentialError::Revoked);
         }
         Ok(())
     }
 
-    /// Register or replace an explicitly enrolled profile. Replacement revokes all previous
-    /// bindings for that profile. Enrollment authority is provided outside project input.
-    pub fn replace_profile(&self, profile: Uuid) -> Result<()> {
+    /// Register or replace the trusted binding inventory of an enrolled profile.
+    /// Replacement revokes all prior bindings atomically. Enrollment authority is
+    /// supplied by the host outside project input; this is not destination policy.
+    pub fn replace_profile(&self, profile: Uuid, bindings: &[BindingSpec]) -> Result<()> {
+        if bindings.is_empty() || bindings.iter().any(|binding| binding.profile != profile) {
+            return Err(CredentialError::Configuration);
+        }
+        if bindings.len() > ENROLLED_BINDINGS {
+            return Err(CredentialError::Capacity);
+        }
+        let bindings_set: HashSet<_> = bindings.iter().copied().collect();
+        if bindings_set.len() != bindings.len() {
+            return Err(CredentialError::Configuration);
+        }
         let mut state = self.lock()?;
         if state.closed {
             return Err(CredentialError::Revoked);
@@ -450,9 +526,24 @@ impl CredentialResolver {
         if !state.profiles.contains_key(&profile) && state.profiles.len() >= SLOTS {
             return Err(CredentialError::Capacity);
         }
+        let other_bindings: usize = state
+            .profiles
+            .iter()
+            .filter(|(id, _)| **id != profile)
+            .map(|(_, enrollment)| enrollment.bindings.len())
+            .sum();
+        if other_bindings + bindings_set.len() > ENROLLED_BINDINGS {
+            return Err(CredentialError::Capacity);
+        }
         let generation = state.next_id()?;
         Self::retire_profile(&mut state, profile);
-        state.profiles.insert(profile, generation);
+        state.profiles.insert(
+            profile,
+            Enrollment {
+                generation,
+                bindings: bindings_set,
+            },
+        );
         Ok(())
     }
 
@@ -476,24 +567,26 @@ impl CredentialResolver {
         Ok(())
     }
 
-    /// Validate explicit source admission and bind to the current enrolled profile.
-    /// The spec must come from trusted enrollment, never directly from project input.
+    /// Validate explicit source admission against the trusted enrollment inventory.
     /// No acquisition or secret-store access occurs here.
     pub fn bind(&self, spec: BindingSpec, selection: SourceSelection<'_>) -> Result<Binding> {
         admit_source(selection, Source::Dynamic(spec.source))?;
         let state = self.lock()?;
-        let generation = state
+        if state.closed {
+            return Err(CredentialError::Revoked);
+        }
+        let enrollment = state
             .profiles
             .get(&spec.profile)
-            .copied()
-            .ok_or(CredentialError::Revoked)?;
-        let binding = Binding {
+            .ok_or(CredentialError::Configuration)?;
+        if !enrollment.bindings.contains(&spec) {
+            return Err(CredentialError::Configuration);
+        }
+        Ok(Binding {
             context: self.identity,
             spec,
-            generation,
-        };
-        self.check(&state, binding)?;
-        Ok(binding)
+            generation: enrollment.generation,
+        })
     }
 
     // Admission and result publication are generation-checked under the registry lock.
@@ -570,7 +663,7 @@ impl CredentialResolver {
         let (id, mut receiver) = {
             let mut state = self.lock()?;
             self.check(&state, binding)?;
-            let now = state.observe(self.clock.sample()?)?;
+            let now = self.observe_clock(&mut state)?;
             if let Some(Entry::Cached(lease, _)) = state.entries.get(&binding) {
                 return Ok(*lease);
             }
@@ -668,7 +761,7 @@ impl CredentialResolver {
             }
             let acquired = joined.map_err(|_| CredentialError::Acquisition)??;
             let expiry = Expiry::calculate(start, &acquired)?;
-            if !expiry.usable(state.observe(self.clock.sample()?)?) {
+            if !expiry.usable(self.observe_clock(&mut state)?) {
                 return Err(CredentialError::Expiry);
             }
             Ok((
@@ -719,7 +812,7 @@ impl CredentialResolver {
         if Instant::now() >= deadline {
             return Err(CredentialError::Deadline);
         }
-        state.observe(self.clock.sample()?)?;
+        self.observe_clock(state)?;
         match state.entries.get(&binding) {
             Some(Entry::Cached(current, material)) if *current == lease => Ok(material),
             _ => Err(CredentialError::Stale),
@@ -759,7 +852,7 @@ impl CredentialResolver {
         if self.check(&state, binding).is_err() {
             return Ok(Invalidation::Revoked);
         }
-        state.observe(self.clock.sample()?)?;
+        self.observe_clock(&mut state)?;
         if matches!(state.entries.get(&binding), Some(Entry::Cached(current, _)) if *current == lease)
         {
             state.entries.remove(&binding);
@@ -769,22 +862,25 @@ impl CredentialResolver {
         }
     }
 
+    fn close(&self) -> Result<()> {
+        let mut state = self.lock()?;
+        state.closed = true;
+        state.profiles.clear();
+        let keys: Vec<_> = state.entries.keys().copied().collect();
+        for key in keys {
+            state.retire(key, CredentialError::Revoked);
+        }
+        for cancellation in state.producers.values() {
+            cancellation.send_replace(true);
+        }
+        Ok(())
+    }
+
     /// Close admission, revoke all leases, cancel producers and await actual termination.
     /// On deadline failure the resolver stays closed and still tracks unjoined producers.
     pub async fn shutdown(&self, deadline: Instant) -> Result<()> {
         let mut count = self.producer_count.subscribe();
-        {
-            let mut state = self.lock()?;
-            state.closed = true;
-            state.profiles.clear();
-            let keys: Vec<_> = state.entries.keys().copied().collect();
-            for key in keys {
-                state.retire(key, CredentialError::Revoked);
-            }
-            for cancellation in state.producers.values() {
-                cancellation.send_replace(true);
-            }
-        }
+        self.close()?;
         tokio::time::timeout_at(deadline, count.wait_for(|count| *count == 0))
             .await
             .map_err(|_| CredentialError::ShutdownIncomplete)?

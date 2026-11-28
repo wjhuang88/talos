@@ -151,6 +151,18 @@ mod tests {
     }
 
     #[test]
+    fn credential_lifecycle_legacy_static_desktop_preview() {
+        let mut config = Config::default();
+        config.set_active_model("openai/o3").expect("catalog model");
+        config.providers.entry("openai".into()).or_default().api_key =
+            Some("synthetic-i338-host-canary".into());
+        let (provider, _) = configured_provider(&config).expect("legacy provider");
+        let preview = provider.request_preview(&[]).expect("preview");
+        assert!(preview["headers"].get("Authorization").is_some());
+        assert!(!preview.to_string().contains("synthetic-i338-host-canary"));
+    }
+
+    #[test]
     fn incomplete_config_is_rejected_before_credentials_are_read() {
         let config = Config::default();
         let error = configured_provider(&config)
