@@ -377,6 +377,14 @@ jobs:
           ./scripts/probe_i324_official_writer_profile.ps1 -Package MinGit -PeImportsOnly
           ./scripts/probe_i324_official_writer_profile.ps1 -Package PortableGit -PeImportsOnly
 
+      - name: I324 pinned global source semantics matrix
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/i324-b-global-source-matrix'
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          ./scripts/probe_i324_official_writer_profile.ps1 -GlobalMatrix
+          ./scripts/probe_i324_official_writer_profile.ps1 -GlobalMatrix -ReferenceVersion
+
       - name: Probe native recovery writable mapping boundary
         shell: pwsh
         run: ./scripts/probe_windows_recovery_mapping.ps1
