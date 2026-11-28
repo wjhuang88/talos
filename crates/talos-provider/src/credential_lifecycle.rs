@@ -257,7 +257,11 @@ impl Expiry {
     fn calculate(start: ClockSample, value: &AcquiredCredential) -> Result<Self> {
         let absolute = value
             .absolute_expiry
-            .map(|expiry| expiry.checked_sub(start.wall).ok_or(CredentialError::Expiry))
+            .map(|expiry| {
+                expiry
+                    .checked_sub(start.wall)
+                    .ok_or(CredentialError::Expiry)
+            })
             .transpose()?;
         let span = match (value.ttl, absolute) {
             (Some(ttl), Some(absolute)) => ttl.min(absolute),
@@ -272,8 +276,14 @@ impl Expiry {
             .filter(|duration| !duration.is_zero())
             .ok_or(CredentialError::Expiry)?;
         Ok(Self {
-            monotonic: start.monotonic.checked_add(usable).ok_or(CredentialError::Expiry)?,
-            wall: start.wall.checked_add(usable).ok_or(CredentialError::Expiry)?,
+            monotonic: start
+                .monotonic
+                .checked_add(usable)
+                .ok_or(CredentialError::Expiry)?,
+            wall: start
+                .wall
+                .checked_add(usable)
+                .ok_or(CredentialError::Expiry)?,
         })
     }
 
@@ -336,7 +346,10 @@ struct State {
 
 impl State {
     fn next_id(&mut self) -> Result<u64> {
-        self.sequence = self.sequence.checked_add(1).ok_or(CredentialError::Unavailable)?;
+        self.sequence = self
+            .sequence
+            .checked_add(1)
+            .ok_or(CredentialError::Unavailable)?;
         Ok(self.sequence)
     }
 
@@ -357,7 +370,8 @@ impl State {
 
     fn observe(&mut self, now: ClockSample) -> Result<ClockSample> {
         if self.last_monotonic.is_some_and(|last| now.monotonic < last) {
-            self.entries.retain(|_, entry| matches!(entry, Entry::Flight(_)));
+            self.entries
+                .retain(|_, entry| matches!(entry, Entry::Flight(_)));
             return Err(CredentialError::Expiry);
         }
         self.last_monotonic = Some(now.monotonic);
@@ -417,7 +431,8 @@ impl CredentialResolver {
     }
 
     fn check(&self, state: &State, binding: Binding) -> Result<()> {
-        if state.closed || binding.context != self.identity
+        if state.closed
+            || binding.context != self.identity
             || state.profiles.get(&binding.spec.profile) != Some(&binding.generation)
         {
             return Err(CredentialError::Revoked);
@@ -442,7 +457,9 @@ impl CredentialResolver {
     }
 
     fn retire_profile(state: &mut State, profile: Uuid) {
-        let keys: Vec<_> = state.entries.keys()
+        let keys: Vec<_> = state
+            .entries
+            .keys()
             .filter(|key| key.spec.profile == profile)
             .copied()
             .collect();
@@ -465,8 +482,16 @@ impl CredentialResolver {
     pub fn bind(&self, spec: BindingSpec, selection: SourceSelection<'_>) -> Result<Binding> {
         admit_source(selection, Source::Dynamic(spec.source))?;
         let state = self.lock()?;
-        let generation = state.profiles.get(&spec.profile).copied().ok_or(CredentialError::Revoked)?;
-        let binding = Binding { context: self.identity, spec, generation };
+        let generation = state
+            .profiles
+            .get(&spec.profile)
+            .copied()
+            .ok_or(CredentialError::Revoked)?;
+        let binding = Binding {
+            context: self.identity,
+            spec,
+            generation,
+        };
         self.check(&state, binding)?;
         Ok(binding)
     }
@@ -552,34 +577,49 @@ impl CredentialResolver {
             if state.waiters >= TOTAL_WAITERS {
                 return Err(CredentialError::Capacity);
             }
-            let (id, receiver) = if let Some(Entry::Flight(flight)) = state.entries.get_mut(&binding) {
-                if flight.waiters >= PER_KEY_WAITERS {
-                    return Err(CredentialError::Capacity);
-                }
-                flight.waiters += 1;
-                (flight.id, flight.result.subscribe())
-            } else {
-                if state.entries.len() >= SLOTS || state.producers.len() >= PRODUCERS {
-                    return Err(CredentialError::Capacity);
-                }
-                let runtime = tokio::runtime::Handle::try_current().map_err(|_| CredentialError::Unavailable)?;
-                let id = state.next_id()?;
-                let (result, receiver) = watch::channel(None);
-                let (cancel, signal) = watch::channel(false);
-                state.entries.insert(binding, Entry::Flight(Flight { id, waiters: 1, result }));
-                state.producers.insert(id, cancel);
-                self.producer_count.send_replace(state.producers.len());
-                let resolver = Arc::clone(self);
-                let producer_deadline = Instant::now() + PRODUCER_TIMEOUT;
-                runtime.spawn(async move {
-                    resolver.produce(binding, id, now, Cancellation(signal), producer_deadline).await;
-                });
-                (id, receiver)
-            };
+            let (id, receiver) =
+                if let Some(Entry::Flight(flight)) = state.entries.get_mut(&binding) {
+                    if flight.waiters >= PER_KEY_WAITERS {
+                        return Err(CredentialError::Capacity);
+                    }
+                    flight.waiters += 1;
+                    (flight.id, flight.result.subscribe())
+                } else {
+                    if state.entries.len() >= SLOTS || state.producers.len() >= PRODUCERS {
+                        return Err(CredentialError::Capacity);
+                    }
+                    let runtime = tokio::runtime::Handle::try_current()
+                        .map_err(|_| CredentialError::Unavailable)?;
+                    let id = state.next_id()?;
+                    let (result, receiver) = watch::channel(None);
+                    let (cancel, signal) = watch::channel(false);
+                    state.entries.insert(
+                        binding,
+                        Entry::Flight(Flight {
+                            id,
+                            waiters: 1,
+                            result,
+                        }),
+                    );
+                    state.producers.insert(id, cancel);
+                    self.producer_count.send_replace(state.producers.len());
+                    let resolver = Arc::clone(self);
+                    let producer_deadline = Instant::now() + PRODUCER_TIMEOUT;
+                    runtime.spawn(async move {
+                        resolver
+                            .produce(binding, id, now, Cancellation(signal), producer_deadline)
+                            .await;
+                    });
+                    (id, receiver)
+                };
             state.waiters += 1;
             (id, receiver)
         };
-        let _waiter = Waiter { resolver: Arc::clone(self), binding, id };
+        let _waiter = Waiter {
+            resolver: Arc::clone(self),
+            binding,
+            id,
+        };
         let result = tokio::select! {
             biased;
             () = cancellation.cancelled() => Err(CredentialError::Cancelled),
@@ -604,9 +644,8 @@ impl CredentialResolver {
         let source = Arc::clone(&self.source);
         // The supervisor retains the registry permit until the actual producer has joined.
         // A retired identity can never publish, even if its source ignores cancellation.
-        let mut task = tokio::spawn(async move {
-            source.acquire(binding, cancellation, deadline).await
-        });
+        let mut task =
+            tokio::spawn(async move { source.acquire(binding, cancellation, deadline).await });
         let joined = tokio::select! {
             result = &mut task => result,
             () = tokio::time::sleep_until(deadline) => {
@@ -632,12 +671,21 @@ impl CredentialResolver {
             if !expiry.usable(state.observe(self.clock.sample()?)?) {
                 return Err(CredentialError::Expiry);
             }
-            Ok((LeaseRef { binding, revision: id, expiry }, acquired.material))
+            Ok((
+                LeaseRef {
+                    binding,
+                    revision: id,
+                    expiry,
+                },
+                acquired.material,
+            ))
         })();
         if let Some(Entry::Flight(flight)) = state.entries.remove(&binding) {
             match result {
                 Ok((lease, material)) => {
-                    state.entries.insert(binding, Entry::Cached(lease, material));
+                    state
+                        .entries
+                        .insert(binding, Entry::Cached(lease, material));
                     flight.result.send_replace(Some(Ok(lease)));
                 }
                 Err(error) => {
@@ -680,9 +728,15 @@ impl CredentialResolver {
 
     /// Atomic binding/generation/revision/expiry check at dispatch admission.
     /// C owns final sealed-request authorization and cancellation of admitted transport.
-    pub fn validate_current(&self, binding: Binding, lease: LeaseRef, deadline: Instant) -> Result<()> {
+    pub fn validate_current(
+        &self,
+        binding: Binding,
+        lease: LeaseRef,
+        deadline: Instant,
+    ) -> Result<()> {
         let mut state = self.lock()?;
-        self.current(&mut state, binding, lease, deadline).map(|_| ())
+        self.current(&mut state, binding, lease, deadline)
+            .map(|_| ())
     }
 
     /// Scoped synchronous access for a trusted authorizer. No await/reentry in the callback;
@@ -706,7 +760,8 @@ impl CredentialResolver {
             return Ok(Invalidation::Revoked);
         }
         state.observe(self.clock.sample()?)?;
-        if matches!(state.entries.get(&binding), Some(Entry::Cached(current, _)) if *current == lease) {
+        if matches!(state.entries.get(&binding), Some(Entry::Cached(current, _)) if *current == lease)
+        {
             state.entries.remove(&binding);
             Ok(Invalidation::Invalidated)
         } else {
