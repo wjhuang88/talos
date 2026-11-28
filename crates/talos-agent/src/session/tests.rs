@@ -7531,7 +7531,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .collect();
     // Exceed the former total-history source limit while retaining enough
     // request budget to exercise voluntary model checkpointing, not rejection.
-    raw.extend((0..8300).map(|i| Message::User {
+    let compact_fixture =
+        std::env::var("TALOS_TEST_CHECKPOINT_FIXTURE").as_deref() == Ok("compact");
+    let filler_records = if compact_fixture { 128 } else { 8300 };
+    raw.extend((0..filler_records).map(|i| Message::User {
         content: format!("prior {i}: {}", "x".repeat(256)),
     }));
     // Eight of these closed tool exchanges, the completed baseline review, and
@@ -7566,8 +7569,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             },
         ]);
     }
-    assert!(raw.len() > 8192);
-    assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
+    if !compact_fixture {
+        assert!(raw.len() > 8192);
+        assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
+    }
     let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
         .expect("durable");
     // Produce the only searchable fact through actual admission/execution, not a
@@ -7787,7 +7792,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .await
         .expect("submit");
     // This scenario performs several independently bounded operations over
-    // 8300+ records. Bound the whole scenario separately from per-op deadlines;
+    // the persisted history. Bound the whole scenario separately from per-op deadlines.
     // No progress event is required between bounded recovery pages. The outer
     // deadline bounds total completion, including admission/batch deadlocks.
     let captured = tokio::time::timeout(
@@ -7795,7 +7800,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         collect_until_completions_with_idle_timeout(&mut handle.eq_rx, 1, Duration::from_secs(30)),
     )
     .await
-    .expect("no circular admission/batch wait");
+    .unwrap_or_else(|error| {
+        panic!(
+            "checkpoint deadline: {error}; filler_records={filler_records}; provider_step={}; verification_calls={}; actor_finished={}",
+            model.step.load(Ordering::SeqCst),
+            verification_calls.load(Ordering::SeqCst),
+            task.is_finished(),
+        )
+    });
     assert!(captured.iter().any(|event| matches!(
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })

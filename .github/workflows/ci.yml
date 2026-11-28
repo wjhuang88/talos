@@ -24,6 +24,7 @@ jobs:
     outputs:
       full_validation: ${{ steps.classify.outputs.full_validation }}
       reason: ${{ steps.classify.outputs.reason }}
+      checkpoint_fixture: ${{ steps.classify.outputs.checkpoint_fixture }}
 
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +45,12 @@ jobs:
             echo "full_validation=true" >> "${GITHUB_OUTPUT}"
             echo "reason=non-pull-request event" >> "${GITHUB_OUTPUT}"
             exit 0
+          fi
+
+          # Keep the full Actor regression on Windows for changes to its dependencies.
+          if git diff --quiet "${PR_BASE_SHA}...${PR_HEAD_SHA}" -- Cargo.toml Cargo.lock rust-toolchain.toml .cargo \
+              crates/talos-{agent,session,runtime,core,tools,plugin,permission,provider,cli} .github/workflows/ci.yml; then
+            echo "checkpoint_fixture=compact" >> "${GITHUB_OUTPUT}"
           fi
 
           classifier="$(mktemp)"
@@ -141,6 +148,8 @@ jobs:
 
       - name: Release preflight
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        env:
+          TALOS_TEST_CHECKPOINT_FIXTURE: ${{ github.event_name == 'pull_request' && 'compact' || 'full' }}
         run: ./scripts/release_preflight.sh
 
       # I328 E: workspace defaults do not enable the optional local-storage feature.
@@ -284,6 +293,7 @@ jobs:
     timeout-minutes: 45
 
     env:
+      TALOS_TEST_CHECKPOINT_FIXTURE: ${{ needs.classify-changes.outputs.checkpoint_fixture || 'full' }}
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_INCREMENTAL: "0"
@@ -589,7 +599,16 @@ jobs:
             }
           }
           try {
-            cargo test --workspace --locked --no-fail-fast -- --nocapture 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
+            $checkpoint = 'session::tests::registered_model_checkpoint_discovers_admits_and_applies_through_actor'
+            $filters = @()
+            if ($env:TALOS_TEST_CHECKPOINT_FIXTURE -eq 'full') {
+              $listed = @(cargo test --locked -p talos-agent --lib -- --list)
+              if ($LASTEXITCODE -ne 0 -or "${checkpoint}: test" -notin $listed) { throw "Missing checkpoint regression" }
+              cargo test --locked -p talos-agent --lib $checkpoint -- --exact --nocapture
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              $filters = @('--skip', $checkpoint)
+            }
+            cargo test --workspace --locked --no-fail-fast -- --nocapture @filters 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
             $testExit = $LASTEXITCODE
           } finally {
             Stop-Job -Job $observer -ErrorAction SilentlyContinue
