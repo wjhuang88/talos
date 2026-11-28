@@ -145,6 +145,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Release preflight
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
@@ -209,6 +211,11 @@ jobs:
         with:
           toolchain: 1.99.0
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Leave room for the native workspace and Desktop build caches.
+          cache-targets: false
+          key: registry-only
       - name: Optional language Plugin acceptance
         timeout-minutes: 15
         shell: bash
@@ -237,6 +244,8 @@ jobs:
         with:
           toolchain: 1.99.0
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       - name: Desktop explicit feature validation
         timeout-minutes: 20
         shell: bash
@@ -309,6 +318,8 @@ jobs:
           toolchain: 1.99.0
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Record native Git transport executables
         shell: pwsh
@@ -698,6 +709,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           key: windows-desktop
 
       - name: Desktop explicit feature validation
@@ -731,6 +743,8 @@ jobs:
         with:
           toolchain: 1.99.0
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       - name: Native display and font development dependencies
         run: |
           sudo apt-get update
