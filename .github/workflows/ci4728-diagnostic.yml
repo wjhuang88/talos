@@ -1,0 +1,49 @@
+name: CI4728 Windows differential
+on:
+  push:
+    branches: [diagnostics/ci4728-windows-runner]
+permissions:
+  contents: read
+jobs:
+  differential:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      TALOS_TEST_CHECKPOINT_FIXTURE: full
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6fa907dec9f7587c06dc1c943159cb52c5057c82
+          path: base
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: c7d905bd7a271f9ecd7cdd0a6cd634bbf0eafecf
+          path: pr
+          persist-credentials: false
+      - shell: pwsh
+        run: |
+          if (Test-Path Env:TALOS_TEST_CHECKPOINT_RESTART_ROOT) { throw 'unexpected restart root' }
+          foreach ($side in 'base','pr') {
+            Push-Location $side
+            rustc +1.99.0 -vV
+            git rev-parse HEAD
+            cargo +1.99.0 test --locked -p talos-agent --lib --no-run
+            if ($LASTEXITCODE) { exit 1 }
+            Pop-Location
+          }
+          $failed = $false
+          foreach ($n in 1..10) {
+            foreach ($side in 'base','pr') {
+              Push-Location $side
+              Write-Host "CI4728_SAMPLE side=$side n=$n"
+              cargo +1.99.0 test --locked -p talos-agent --lib session::tests::registered_model_checkpoint_discovers_admits_and_applies_through_actor -- --exact --nocapture
+              if ($LASTEXITCODE) { $failed = $true }
+              Pop-Location
+            }
+            if ($failed) { exit 1 }
+          }
