@@ -1,5 +1,5 @@
 # I324 test-only official Git package oracle; never point at an installed Git.
-param([ValidateSet('MinGit','PortableGit')][string]$Package = 'MinGit', [switch]$SelectedWriterOnly, [switch]$PeImportsOnly)
+param([ValidateSet('MinGit','PortableGit')][string]$Package = 'MinGit', [switch]$SelectedWriterOnly, [switch]$PeImportsOnly, [switch]$GlobalMatrix, [switch]$ReferenceVersion)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Native Windows PowerShell 7 required.' }
@@ -7,12 +7,20 @@ $packages = @{
     MinGit = @{ Name='MinGit-2.36.1-64-bit.zip'; Sha='a7a78c306dea018cc7ca3efe6a0d87c1dd7a43762705ccb0c5e31e3e44349207' }
     PortableGit = @{ Name='PortableGit-2.36.1-64-bit.7z.exe'; Sha='af17a2803c5c6406b9b60dfef2d34f72f218975f9d78df21005a44f6e2f0caf9' }
 }
+if ($ReferenceVersion -and -not $GlobalMatrix) { throw 'Reference version is matrix-only.' }
+if ($GlobalMatrix -and ($Package -ne 'MinGit' -or $SelectedWriterOnly -or $PeImportsOnly)) { throw 'Global matrix uses MinGit native bin only.' }
+$release = 'v2.36.1.windows.1'
+if ($ReferenceVersion) {
+    $release = 'v2.47.1.windows.1'
+    # Git for Windows release announcement SHA-256, not a live latest URL.
+    $packages['MinGit'] = @{ Name='MinGit-2.47.1-64-bit.zip'; Sha='50b04b55425b5c465d076cdb184f63a0cd0f86f6ec8bb4d5860114a713d2c29a' }
+}
 $root = Join-Path ([IO.Path]::GetTempPath()) ('talos-i324-profile-' + [guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($root) | Out-Null
 try {
     $receipt = $packages[$Package]
     $archive = Join-Path $root $receipt.Name
-    $uri = 'https://github.com/git-for-windows/git/releases/download/v2.36.1.windows.1/' + $receipt.Name
+    $uri = 'https://github.com/git-for-windows/git/releases/download/' + $release + '/' + $receipt.Name
     Invoke-WebRequest -Uri $uri -OutFile $archive -MaximumRedirection 5
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $receipt.Sha) {
         throw 'Package checksum mismatch; nothing extracted or executed.'
@@ -147,6 +155,126 @@ try {
     }
     function Assert-Equal([string]$Actual,[string]$Expected,[string]$Case) {
         if ($Actual -cne $Expected) { throw "I324 profile mismatch case=$Case; output withheld." }
+    }
+    if ($GlobalMatrix) {
+        # Source semantics only. Never call this the selected/rebound writer.
+        $exe = Join-Path $install 'mingw64/bin/git.exe'
+        if (-not [IO.File]::Exists($exe)) { throw 'Pinned matrix native image missing.' }
+        $imageHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+        $appData = Join-Path $root 'app data'
+        $localData = Join-Path $root 'local data'
+        $template = Join-Path $root 'empty-template'
+        foreach ($dir in @($appData,$localData,$template,(Join-Path $appData 'Git'))) {
+            [IO.Directory]::CreateDirectory($dir) | Out-Null
+        }
+        $envBase = @{
+            APPDATA=$appData; LOCALAPPDATA=$localData;
+            GIT_CONFIG_NOSYSTEM='1'; GIT_ATTR_NOSYSTEM='1'; GIT_TEMPLATE_DIR=$template
+        }
+        Assert-Equal ((Invoke-Oracle $exe @('--version') $envBase).Trim()) ("git version " + $release.Substring(1)) 'matrix-version'
+        [void](Invoke-Oracle $exe @('init','-q') $envBase)
+        $homeCfg = Join-Path $isolatedHome '.gitconfig'
+        $homeXdgCfg = Join-Path $isolatedHome '.config/git/config'
+        $homeAttr = Join-Path $isolatedHome '.config/git/attributes'
+        $xdgCfg = Join-Path $xdg 'git/config'
+        $xdgAttr = Join-Path $xdg 'git/attributes'
+        $appCfg = Join-Path $appData 'Git/config'
+        $appAttr = Join-Path $appData 'Git/attributes'
+        function Set-MatrixFile([string]$Path,[string]$State,[string]$Text) {
+            if ([IO.File]::Exists($Path)) { Remove-Item -LiteralPath $Path -Force }
+            if ($State -ceq 'empty') { Write-Fixture $Path '' }
+            elseif ($State -ceq 'value') { Write-Fixture $Path $Text }
+            elseif ($State -cne 'missing') { throw 'Unknown matrix state.' }
+        }
+        function Assert-MatrixPaths([string]$Actual,[string[]]$Expected,[string]$Case) {
+            $lines = @($Actual.TrimEnd([char]13,[char]10) -split '\r?\n')
+            if ($lines.Count -ne $Expected.Count) { throw "Matrix path count mismatch case=$Case" }
+            for ($i = 0; $i -lt $Expected.Count; $i++) {
+                # Compare slash spelling only; do not resolve relative paths
+                # or canonicalize a reported path into a successful match.
+                if (-not $lines[$i].Replace('\','/').Equals($Expected[$i].Replace('\','/'),[StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Matrix path mismatch case=$Case index=$i; output withheld."
+                }
+            }
+        }
+        Write-Fixture $homeCfg "[i324]`n    profile = home"
+        Write-Fixture $homeXdgCfg "[i324]`n    profile = fallback"
+        Write-Fixture $homeAttr 'i324-fixture.txt i324=fallback'
+        # Each row compares actual old/new source consumption, and the newer
+        # var output separately. Empty APPDATA files select a source even
+        # though they contain no records. Config and attributes may differ.
+        $rows = @(
+            @{Name='explicit-xdg'; Xdg='value'; Config='value'; Attr='value'; Fallback=$false},
+            @{Name='explicit-xdg-empty'; Xdg='empty'; Config='value'; Attr='value'; Fallback=$false},
+            @{Name='explicit-xdg-missing'; Xdg='missing'; Config='value'; Attr='value'; Fallback=$false},
+            @{Name='fallback-app-absent'; Xdg='value'; Config='missing'; Attr='missing'; Fallback=$true},
+            @{Name='fallback-app-empty'; Xdg='value'; Config='empty'; Attr='empty'; Fallback=$true},
+            @{Name='fallback-app-values'; Xdg='value'; Config='value'; Attr='value'; Fallback=$true},
+            @{Name='fallback-app-config-only'; Xdg='value'; Config='value'; Attr='missing'; Fallback=$true},
+            @{Name='fallback-app-attr-only'; Xdg='value'; Config='missing'; Attr='value'; Fallback=$true},
+            @{Name='fallback-app-empty-config-only'; Xdg='value'; Config='empty'; Attr='missing'; Fallback=$true},
+            @{Name='fallback-app-empty-attr-only'; Xdg='value'; Config='missing'; Attr='empty'; Fallback=$true}
+        )
+        foreach ($row in $rows) {
+            Set-MatrixFile $xdgCfg $row.Xdg "[i324]`n    profile = xdg"
+            Set-MatrixFile $xdgAttr $row.Xdg 'i324-fixture.txt i324=xdg'
+            Set-MatrixFile $appCfg $row.Config "[i324]`n    profile = app"
+            Set-MatrixFile $appAttr $row.Attr 'i324-fixture.txt i324=app'
+            $envCase = $envBase.Clone()
+            if ($row.Fallback) { $envCase['XDG_CONFIG_HOME'] = '' }
+            $configPath = $xdgCfg
+            $attributePath = $xdgAttr
+            $configValue = if ($row.Xdg -ceq 'value') { 'xdg,home' } else { 'home' }
+            $attributeValue = if ($row.Xdg -ceq 'value') { 'xdg' } else { 'unspecified' }
+            if ($row.Fallback) {
+                $configPath = $homeXdgCfg
+                $attributePath = $homeAttr
+                $configValue = 'fallback,home'
+                $attributeValue = 'fallback'
+                if ($ReferenceVersion -and $row.Config -cne 'missing') {
+                    $configPath = $appCfg
+                    $configValue = if ($row.Config -ceq 'value') { 'app,home' } else { 'home' }
+                }
+                if ($ReferenceVersion -and $row.Attr -cne 'missing') {
+                    $attributePath = $appAttr
+                    $attributeValue = if ($row.Attr -ceq 'value') { 'app' } else { 'unspecified' }
+                }
+            }
+            $values = (Invoke-Oracle $exe @('config','--get-all','i324.profile') $envCase).Trim() -split '\r?\n'
+            Assert-Equal ($values -join ',') $configValue "$($row.Name)-config"
+            Assert-Equal ((Invoke-Oracle $exe @('check-attr','i324','--','i324-fixture.txt') $envCase).Trim()) "i324-fixture.txt: i324: $attributeValue" "$($row.Name)-attributes"
+            if ($ReferenceVersion) {
+                Assert-MatrixPaths (Invoke-Oracle $exe @('var','GIT_CONFIG_GLOBAL') $envCase) @($configPath,$homeCfg) "$($row.Name)-var-config"
+                Assert-MatrixPaths (Invoke-Oracle $exe @('var','GIT_ATTR_GLOBAL') $envCase) @($attributePath) "$($row.Name)-var-attr"
+            }
+            Write-Output "I324_GLOBAL_MATRIX version=$release case=$($row.Name) config=$configValue attributes=$attributeValue var_checked=$([bool]$ReferenceVersion) result=pass"
+        }
+        # Explicit attributesFile overrides: absolute (spaces), tilde, and
+        # repository-relative. Relative path is source-consumption evidence,
+        # not permission to accept a relative var result as an absolute path.
+        $overrideDir = Join-Path $isolatedHome 'override dir'
+        [IO.Directory]::CreateDirectory($overrideDir) | Out-Null
+        $absoluteAttr = Join-Path $overrideDir 'absolute attrs'
+        $tildeAttr = Join-Path $overrideDir 'tilde attrs'
+        $relativeAttr = Join-Path $fixture 'relative attrs'
+        $forms = @(
+            @{Name='absolute'; Value=$absoluteAttr.Replace('\','/'); Path=$absoluteAttr},
+            @{Name='tilde'; Value='~/override dir/tilde attrs'; Path=$tildeAttr},
+            @{Name='relative'; Value='relative attrs'; Path=$relativeAttr}
+        )
+        foreach ($form in $forms) {
+            Write-Fixture $form.Path "i324-fixture.txt i324=override-$($form.Name)"
+        }
+        foreach ($form in $forms) {
+            [void](Invoke-Oracle $exe @('config','--local','core.attributesFile',$form.Value) $envBase)
+            Assert-Equal ((Invoke-Oracle $exe @('check-attr','i324','--','i324-fixture.txt') $envBase).Trim()) "i324-fixture.txt: i324: override-$($form.Name)" "$($form.Name)-override"
+            if ($ReferenceVersion -and $form.Name -cne 'relative') {
+                Assert-MatrixPaths (Invoke-Oracle $exe @('var','GIT_ATTR_GLOBAL') $envBase) @($form.Path) "$($form.Name)-var-override"
+            }
+            Write-Output "I324_GLOBAL_MATRIX version=$release case=override-$($form.Name) attributes=override-$($form.Name) result=pass"
+        }
+        Write-Output "I324_GLOBAL_MATRIX_COMPLETE version=$release image=mingw64/bin/git.exe archive_sha256=$($receipt.Sha) image_sha256=$imageHash cases=$($rows.Count + $forms.Count) source_only=true"
+        return
     }
     # Observe the actual rebound sender in the same spelling used by
     # prepared_add::request_sender_program. This is a fixture observation,
