@@ -1,6 +1,6 @@
-## PROVIDER-TEMPERATURE-001 / #1046 — Intake / Unclaimed
+## PROVIDER-TEMPERATURE-001 / #1046 — Active upon merge
 
-[Owner](tasks/openai-chat-sampling-temperature.md) / [#1046](https://github.com/wjhuang88/talos/issues/1046): OpenAI Chat Completions sampling temperature; separate Codex claim #1047 remains proposed. Registration only, no implementation or activation.
+[Owner](tasks/openai-chat-sampling-temperature.md) / [#1046](https://github.com/wjhuang88/talos/issues/1046): OpenAI Chat Completions sampling temperature; Codex claim #1047 proposed, effective only upon its merge. No implementation before effective claim.
 
 ## SEARCH-001-D2-T4 / I339 / #1039 — proposed bounded MCP execution
 
