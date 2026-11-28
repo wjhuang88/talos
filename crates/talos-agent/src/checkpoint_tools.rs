@@ -304,6 +304,8 @@ fn unavailable() -> ToolResult {
 }
 
 fn unavailable_reason(reason: &'static str) -> ToolResult {
+    #[cfg(test)]
+    eprintln!("CI4728_REFUSAL reason={reason}");
     tracing::warn!(reason, "history/checkpoint execution unavailable");
     unavailable()
 }
@@ -517,6 +519,14 @@ impl AgentTool for HistorySearchTool {
                 })
                 .ok()
                 .flatten();
+            #[cfg(test)]
+            eprintln!(
+                "CI4728_QUERY remaining_ms={} ready={}",
+                delivery_deadline
+                    .saturating_duration_since(std::time::Instant::now())
+                    .as_millis(),
+                result.is_some()
+            );
             #[cfg(test)]
             {
                 let hook = execution
