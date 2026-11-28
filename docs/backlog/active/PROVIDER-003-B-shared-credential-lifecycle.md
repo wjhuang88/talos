@@ -1,6 +1,6 @@
 # PROVIDER-003-B: Shared credential lease lifecycle
 
-**Status**: In Progress / Claimed (proposed; effective only on #1025 merge)
+**Status**: In Progress / Claimed
 **Source Issue**: #1024
 **Parent Epic**: PROVIDER-003 / #132
 **Selected Iteration**: I338
@@ -20,8 +20,8 @@
 | Governance Claim PR | #1025 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer delegated B and parallel governance-only claim preparation; main session owns acceptance. Independent protected-scope technical/security review of exact claim head, both validators, applicable CI and merge CAS required; no approval yet. #1021 applies only to #1020 and is not inherited. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-24 |
+| Implementation PR | #1034 |
+| Last Updated | 2026-11-26 |
 | Handoff / Release Condition | No implementation before claim merge; hand C the reviewed lifecycle contract and source/test evidence; maintain #132 open and close B only with existing implementation SHA and independently reviewed acceptance. |
 
 ## Scope and current code evidence
@@ -145,3 +145,7 @@ New bounded enrollment metadata: at most 64 enrolled profiles and 256 total exac
 ### Next verification gate
 
 Main-session assistance required for pinned rustfmt and local locked check/test/clippy on the new checkpoint, then focused CLI/Desktop/SDK fixtures and existing config suite. Provider source contains 20 named focused tests (12 original, 8 additional), plus three new host fixtures; count is source inventory, not execution. Run `cargo fmt --all`, record actual formatted SHA, then fmt check, `cargo check -p talos-provider --tests --locked`, `cargo test -p talos-provider --locked credential_lifecycle`, and `cargo clippy -p talos-provider --all-targets --locked -- -D warnings`; separately record any baseline diagnostics. Run `cargo test -p talos-config --locked`, and `cargo test -p talos-cli -p talos-runtime -p talos-desktop --locked credential_lifecycle` where host prerequisites permit; applicable Desktop explicit-feature/native checks and workspace check/clippy/test --locked remain required. Keep failed/skipped items, exact SHA and logs. SDK contract documents opt-in context and C handoff. This is an unvalidated development checkpoint, not stable implementation PR, Review, Complete, or authorization to merge. Main session remains independent acceptance owner.
+
+## Phase three local verification and implementation PR (2026-11-26)
+
+Claim #1025 effective on main at 2645018339892020b7d01633b8a6f9ad6615c197. Implementation PR #1034, independent review required; no completion or merge authorization. Main-session receipt at [#1024 comment 7167456663](https://github.com/wjhuang88/talos/issues/1024#issuecomment-7167456663), tested code SHA `d7102b28d6aa71af39cebf743ffb708554d73dec`, pinned Rust 1.99.0: fmt/check passed; provider credential_lifecycle 20/20; config 309/309; CLI and SDK 2/2. Maintainer supplied the follow-up Desktop output for the requested explicit desktop-ui test: `provider::tests::credential_lifecycle_legacy_static_desktop_preview ... ok`, 1 passed, 0 failed, 0 ignored, 117 filtered out. This is user-reported local execution, not a CI receipt. Strict all-targets Clippy exit 101 with 95 reported existing Azure/Bedrock diagnostics; earlier E0308 and zero executed tests retained. All named provider fixtures in the preceding mapping are covered by the reported 20/20 run; the three static host fixtures and config suite passed as reported. No new product or test changes in this receipt commit. Exact-head CI, workspace/platform results, independent lifecycle/security/API review and merge-time CAS remain outstanding. Main checked at a40a077d23c8d28803844da1bfff90f011ec96d7; activation is its ancestor, no changed-file overlap with B in the comparison, no history rewrite. Keep B In Progress/Active until review gates are satisfied; C/D–G separate, parent and child remain open.
