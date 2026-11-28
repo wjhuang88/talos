@@ -1,6 +1,6 @@
 # CI4728 Windows checkpoint history recovery
 
-**Status**: Active (proposed upon claim merge)
+**Status**: Active
 **Selected Iteration**: None (regression maintenance)
 
 ## Collaboration Claim
@@ -15,8 +15,8 @@
 | Source Issue | None |
 | Governance Claim PR | #1053 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending independent review of this claim. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim merged in #1053 at 4f9b5143fe0aaca1078a71fbd19f0838e340ccad. |
+| Implementation PR | #1054 |
 | Last Updated | 2026-11-28 |
 | Handoff / Release Condition | Reproduce the specific failure, validate the correction on native Windows, and hand off residual failure modes with evidence. |
 
