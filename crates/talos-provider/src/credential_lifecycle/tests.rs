@@ -103,10 +103,7 @@ impl FakeClock {
         };
     }
 
-    fn pause_sample(
-        &self,
-        skip: usize,
-    ) -> (oneshot::Receiver<()>, std::sync::mpsc::Sender<()>) {
+    fn pause_sample(&self, skip: usize) -> (oneshot::Receiver<()>, std::sync::mpsc::Sender<()>) {
         let (entered, entry) = oneshot::channel();
         let (release, exit) = std::sync::mpsc::channel();
         let previous = self.gate.lock().expect("gate lock").replace(SampleGate {
