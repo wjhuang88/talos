@@ -126,6 +126,8 @@ enum PreparationStep {
 // Dependency failures may contain transcript data or filesystem paths. Only a
 // fixed call-site code is emitted; no Debug/Display bound is placed on the error.
 fn preparation_failure<T>(reason: &'static str) -> Option<T> {
+    #[cfg(test)]
+    eprintln!("CI4728_PREP reason={reason}");
     tracing::warn!(reason, "history preparation unavailable");
     None
 }
@@ -242,7 +244,32 @@ impl Preparation {
             "linear_index_scope_failed",
         )?;
         preparation_result(
-            index.begin_recovery_build(&scope, source.source_end(), &budget),
+            index
+                .begin_recovery_build(&scope, source.source_end(), &budget)
+                .inspect_err(|_err| {
+                    #[cfg(test)]
+                    {
+                        let message = _err.to_string();
+                        let class = [
+                            "locked",
+                            "busy",
+                            "interrupt",
+                            "budget",
+                            "constraint",
+                            "read-only",
+                            "disk I/O",
+                            "stopped",
+                        ]
+                        .into_iter()
+                        .find(|word| {
+                            message
+                                .to_ascii_lowercase()
+                                .contains(&word.to_ascii_lowercase())
+                        })
+                        .unwrap_or("other");
+                        eprintln!("CI4728_BUILD class={class}");
+                    }
+                }),
             "linear_index_build_failed",
         )?;
         Some(Self {
@@ -562,6 +589,8 @@ impl History {
         {
             Ok(Ok(history)) => Some(history),
             Ok(Err(reason)) => {
+                #[cfg(test)]
+                eprintln!("CI4728_PREP reason={reason}");
                 tracing::warn!(reason, "archive history preparation unavailable");
                 None
             }
