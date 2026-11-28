@@ -65,7 +65,7 @@ jobs:
           fi
 
   preflight:
-    name: Format + Check + Clippy + Test
+    name: macOS workspace preflight
     needs: classify-changes
     if: always()
     runs-on: macos-15
@@ -177,8 +177,30 @@ jobs:
           python3 scripts/accept_auto_locale_tui.py target/debug/talos
           python3 scripts/accept_search_overrides.py target/debug/talos
 
-      - name: Optional language Plugin acceptance
+      - name: Fetch locked dependencies for offline all-feature audit
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        timeout-minutes: 10
+        # Default workspace builds do not fetch optional Desktop/all-target dependencies.
+        run: cargo fetch --locked
+
+      - name: Dependency audit parity (offline)
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        run: bash scripts/test_dependency_audit.sh
+
+  macos-plugins:
+    name: macOS language plugins
+    needs: classify-changes
+    if: always() && !cancelled() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Optional language Plugin acceptance
         timeout-minutes: 15
         shell: bash
         run: |
@@ -193,18 +215,20 @@ jobs:
           export AR_wasm32_unknown_unknown="$wasm_llvm_prefix/bin/llvm-ar"
           bash scripts/validate_language_plugins.sh
 
-      - name: Fetch locked dependencies for offline all-feature audit
-        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
-        timeout-minutes: 10
-        # Default workspace builds do not fetch optional Desktop/all-target dependencies.
-        run: cargo fetch --locked
-
-      - name: Dependency audit parity (offline)
-        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
-        run: bash scripts/test_dependency_audit.sh
-
+  macos-desktop:
+    name: macOS Desktop explicit feature
+    needs: classify-changes
+    if: always() && !cancelled() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - uses: Swatinem/rust-cache@v2
       - name: Desktop explicit feature validation
-        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         timeout-minutes: 20
         shell: bash
         env:
@@ -215,6 +239,26 @@ jobs:
           unset RXCB_EXPORT RING_PREGENERATE_ASM
           cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
           cargo test -p talos-desktop --features desktop-ui --locked
+
+  macos-gate:
+    name: Format + Check + Clippy + Test
+    needs: [classify-changes, preflight, macos-plugins, macos-desktop]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require applicable macOS checks
+        env:
+          PREFLIGHT: ${{ needs.preflight.result }}
+          PLUGINS: ${{ needs.macos-plugins.result }}
+          DESKTOP: ${{ needs.macos-desktop.result }}
+          REDUCED: ${{ needs.classify-changes.result == 'success' && needs.classify-changes.outputs.full_validation == 'false' }}
+        run: |
+          set -eu
+          test "$PREFLIGHT" = success
+          expected=success
+          if [ "$REDUCED" = true ]; then expected=skipped; fi
+          test "$PLUGINS" = "$expected"
+          test "$DESKTOP" = "$expected"
 
   windows-rust:
     name: Windows Rust workspace
