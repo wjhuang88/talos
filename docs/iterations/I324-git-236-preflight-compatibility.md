@@ -245,3 +245,77 @@ counterexample, query-by-query proof obligations and staged source matrix.
 Independent security/API disposition and separate exact-text maintainer
 acceptance are required before any changed trust contract can operate.
 No production change; strict D1 remains effective, #919 stays Open.
+
+
+## 2026-11-27 B global-source matrix candidate
+
+#1043 merged `088c7f2d59d56133b838e6154dd483bdfef07159` as non-operative
+research evidence (CI #4687 overall success, both governance validators,
+[independent review](https://github.com/wjhuang88/talos/pull/1043#issuecomment-7213787037)).
+The reviewer rejected a currently established trusted-installation premise
+for runtime activation; retain strict D1. #1039/#1041 remote intake
+reconciliation is an unrelated advisory residual, not owned by I324.
+
+Direct source comparison reveals a version-specific distinction:
+[2.36.1 path.c](https://github.com/git-for-windows/git/blob/v2.36.1.windows.1/path.c#L1562-L1580)
+uses explicit nonempty XDG or HOME/.config.
+[2.47.1 path.c](https://github.com/git-for-windows/git/blob/v2.47.1.windows.1/path.c#L1480-L1516)
+also checks APPDATA/Git/<filename> when XDG is not nonempty; an existing
+empty file can shadow the HOME fallback and config/attributes can select
+different roots. See [newer var implementation](https://github.com/git-for-windows/git/blob/v2.47.1.windows.1/builtin/var.c)
+and [config.c](https://github.com/git-for-windows/git/blob/v2.47.1.windows.1/config.c).
+Do not generalize newer behavior backward, or assume pure lexical nomination
+can decide a file-existence-dependent branch without admission.
+
+New test-only GlobalMatrix mode uses exact MinGit 2.36.1 and reference
+2.47.1 archives; the latter SHA-256
+`50b04b55425b5c465d076cdb184f63a0cd0f86f6ec8bb4d5860114a713d2c29a`
+is from the
+[release announcement](https://groups.google.com/g/git-for-windows/c/tGboK4nk2aE)
+and [release](https://github.com/git-for-windows/git/releases/tag/v2.47.1.windows.1).
+Archive check precedes extraction/execution. Native bin image and archive
+hashes logged; explicitly source-only, not the rebound writer or installed
+Scoop. Eleven cases per version: explicit XDG populated/empty/missing,
+HOME fallback with APPDATA absent/empty/populated/config-only/attr-only,
+and absolute/tilde/relative attributesFile override with spaces. Assert
+marker consumption and order; newer var output additionally compared
+with expected path spellings including absent/empty sources (relative
+override consumption only). Expected results based on the pinned sources;
+native execution still pending. Fixture uses isolated HOME, XDG, APPDATA,
+LOCALAPPDATA, empty template and system-disabled test invocations, bounded
+per-process timeout, existing disposal/cleanup. No host configuration
+writes, new production commands, or permission change. Disabling system
+sources is fixture isolation only, not a proposed production workaround.
+This is a partial global matrix: known-folder/ProgramData, absent HOME,
+explicit config overrides, include/conditional contexts, full original
+Scoop acceptance and adversarial namespace guarantees remain unresolved.
+No claim of trusted source completeness from the marker outputs.
+
+
+## 2026-11-28 B global-source matrix review remediation
+
+Exact #1044 head `37447f470046216c20422f8d9c89ad758c17fa30` passed
+[CI #4730](https://github.com/wjhuang88/talos/actions/runs/46120427025):
+11/11 jobs, 22/22 original matrix rows, both governance validators
+(0 and 2 warnings), remote issue reconciliation passed. The earlier
+#4691 E0433 missing ignore failures are preserved as historical evidence;
+main includes the git feature dependency repair. Native bin receipts:
+2.36.1 SHA-256 `052e6b3832e83435815c9c2aa59f4f22e4dcaeaad3ae3c961d3b597f4319320d`;
+2.47.1 `51c6331aab2426ae2df187975590587b5a10042e3423f4bc0fdcb54aeb3efab7`.
+The prior override cases used identical markers, so do not claim they
+independently distinguished the three override sources.
+
+[Independent REQUEST CHANGES](https://github.com/wjhuang88/talos/pull/1044#issuecomment-7214552836)
+requires distinct markers for absolute/tilde/relative override files and
+two additional mixed APPDATA cases: empty config with missing attributes,
+missing config with empty attributes. Both changes are implemented in this
+candidate: all three files coexist with unique values, and consumption must
+match the selected form. The old version should retain HOME fallback in
+both mixed rows; the reference version should independently shadow only
+the file that exists empty. Newer var path checks remain mandatory for all
+root rows, absolute and tilde overrides. Relative override remains
+consumption-only; do not infer absolute path admission.
+Thirteen rows per version (26 total); new native CI and re-review pending.
+No changed timeouts, hashes, production permission, source/loader trust
+or issue completion. Known-folder, explicit config overrides, absent HOME,
+conditional includes and original Scoop acceptance remain unresolved.
