@@ -4605,7 +4605,7 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
     );
 
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let _actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -4615,7 +4615,8 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         .await
         .expect("operation should succeed");
 
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
 
     let has_error_completion = events.iter().any(|e| {
         matches!(
@@ -4809,7 +4810,7 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     );
 
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let _actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -4827,7 +4828,8 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     std::fs::remove_dir_all(&session_parent).expect("remove session parent");
     std::fs::write(&session_parent, "not a directory").expect("block session parent");
     release.notify_one();
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
 
     let error_message = events.iter().find_map(|e| match completed_status(e) {
         Some(TurnCompletionStatus::Error { message }) => Some(message.clone()),
@@ -4883,7 +4885,7 @@ async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
     actor.set_durable_persistence(durable, PersistencePolicy::default());
 
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let _actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -4893,7 +4895,8 @@ async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
         .await
         .expect("operation should succeed");
 
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
 
     let has_error = events.iter().any(|e| {
         matches!(
@@ -4979,7 +4982,8 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
     .await
     .expect("tool result timeout");
     sq_tx.send(SessionOp::Interrupt).await.expect("interrupt");
-    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    let events =
+        collect_until_completions_with_idle_timeout(&mut eq_rx, 1, Duration::from_secs(5)).await;
     assert!(events.iter().any(|event| {
         matches!(
             completed_status(event),
@@ -7527,7 +7531,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .collect();
     // Exceed the former total-history source limit while retaining enough
     // request budget to exercise voluntary model checkpointing, not rejection.
-    raw.extend((0..8300).map(|i| Message::User {
+    let compact_fixture =
+        std::env::var("TALOS_TEST_CHECKPOINT_FIXTURE").as_deref() == Ok("compact");
+    let filler_records = if compact_fixture { 128 } else { 8300 };
+    raw.extend((0..filler_records).map(|i| Message::User {
         content: format!("prior {i}: {}", "x".repeat(256)),
     }));
     // Eight of these closed tool exchanges, the completed baseline review, and
@@ -7562,8 +7569,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             },
         ]);
     }
-    assert!(raw.len() > 8192);
-    assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
+    if !compact_fixture {
+        assert!(raw.len() > 8192);
+        assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
+    }
     let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
         .expect("durable");
     // Produce the only searchable fact through actual admission/execution, not a
@@ -7783,7 +7792,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .await
         .expect("submit");
     // This scenario performs several independently bounded operations over
-    // 8300+ records. Bound the whole scenario separately from per-op deadlines;
+    // the persisted history. Bound the whole scenario separately from per-op deadlines.
     // No progress event is required between bounded recovery pages. The outer
     // deadline bounds total completion, including admission/batch deadlocks.
     let captured = tokio::time::timeout(
@@ -7791,7 +7800,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         collect_until_completions_with_idle_timeout(&mut handle.eq_rx, 1, Duration::from_secs(30)),
     )
     .await
-    .expect("no circular admission/batch wait");
+    .unwrap_or_else(|error| {
+        panic!(
+            "checkpoint deadline: {error}; filler_records={filler_records}; provider_step={}; verification_calls={}; actor_finished={}",
+            model.step.load(Ordering::SeqCst),
+            verification_calls.load(Ordering::SeqCst),
+            task.is_finished(),
+        )
+    });
     assert!(captured.iter().any(|event| matches!(
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })

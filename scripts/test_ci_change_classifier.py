@@ -33,7 +33,7 @@ class ClassifierTests(unittest.TestCase):
         workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(
             encoding="utf-8"
         )
-        preflight = workflow.split("\n  preflight:\n", 1)[1].split("\n  windows-rust:\n", 1)[0]
+        preflight = workflow.split("\n  preflight:\n", 1)[1].split("\n  macos-plugins:\n", 1)[0]
         self.assertIn("needs: classify-changes", preflight)
         self.assertIn("    if: always()", preflight)
         self.assertIn(
@@ -46,6 +46,18 @@ class ClassifierTests(unittest.TestCase):
             "needs.classify-changes.outputs.full_validation != 'false'",
             preflight,
         )
+
+    def test_macos_gate_requires_both_parallel_suites_for_full_validation(self) -> None:
+        workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text()
+        for job in ("macos-plugins", "macos-desktop"):
+            block = workflow.split(f"\n  {job}:\n", 1)[1].split("\n\n  ", 1)[0]
+            self.assertIn("needs: classify-changes", block)
+            self.assertIn("needs.classify-changes.outputs.full_validation != 'false'", block)
+        gate = workflow.split("\n  macos-gate:\n", 1)[1].split("\n  windows-rust:", 1)[0]
+        self.assertIn("needs: [classify-changes, preflight, macos-plugins, macos-desktop]", gate)
+        self.assertIn('test "$PREFLIGHT" = success', gate)
+        self.assertIn('test "$PLUGINS" = "$expected"', gate)
+        self.assertIn('test "$DESKTOP" = "$expected"', gate)
 
     def test_windows_gate_requires_workspace_and_desktop(self) -> None:
         workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text()
