@@ -4186,6 +4186,7 @@ dependencies = [
 name = "talos-conversation"
 version = "0.10.1"
 dependencies = [
+ "cap-std",
  "futures",
  "serde",
  "serde_json",

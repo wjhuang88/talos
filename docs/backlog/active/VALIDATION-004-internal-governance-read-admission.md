@@ -17,7 +17,7 @@
 | Governance Claim PR | #1050 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested recovery of the validation change; independent permission review required |
-| Implementation PR | Not started |
+| Implementation PR | #1051 |
 | Last Updated | 2026-11-28 |
 | Handoff / Release Condition | Independent permission review and locked tool tests |
 
@@ -31,3 +31,7 @@ Required reads include [VALIDATION-003](VALIDATION-003-model-validation-agile-to
 4. 通过 locked 权限与工具测试及独立权限审查；在用户文档说明触发 Execute 的 profile。
 
 原现场已有候选测试。目标分支上的实现、验证和审批依据此任务独立交付。
+
+## 2026-11-28 范围变更
+
+维护者将模型工具限定为跨语言的治理元数据检查。以治理标记发现工具，plan/run 均仅处理 governance，旧 workspace 和 i076 请求返回参数错误。模型入口使用进程内检查，无主机命令执行器。原计划中的 Cargo 命令准入验收由旧参数拒绝和仅有 Cargo.toml 时的发现测试替代。独立权限审查继续核实元数据读取边界。

@@ -9,6 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+cap-std = { version = "4.0.3", default-features = false }
 talos-core = { version = "0.10.1", path = "../talos-core" }
 talos-plugin = { version = "0.10.1", path = "../talos-plugin" }
 tokio = { version = "1.53.1", features = ["sync", "macros", "time", "rt", "io-util"] }

@@ -23,15 +23,8 @@ use talos_core::tool::{
 /// These contributions still require the product's normal permission wrappers.
 pub fn project_tool_contributions(workspace: PathBuf) -> Vec<ToolContribution> {
     let mut contributions = agile_tool_contributions(workspace.clone());
-    #[cfg(unix)]
-    contributions.extend(validation_tool_contributions(
+    contributions.extend(validation_tool::governance_validation_contributions(
         workspace,
-        Arc::new(UnixValidationHost::default()),
-    ));
-    #[cfg(windows)]
-    contributions.extend(validation_tool_contributions(
-        workspace,
-        Arc::new(WindowsValidationHost::default()),
     ));
     contributions
 }
