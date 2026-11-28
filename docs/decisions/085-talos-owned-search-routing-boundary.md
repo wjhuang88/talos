@@ -278,3 +278,15 @@ The default compatibility search behavior remains available after L1 even
 if its upstream Cargo package is replaced. No provider or new feature is admitted.
 L1 code requires a separately effective governance claim/iteration,
 independent API/network/security review and exact-head multi-platform CI.
+
+
+## Amendment A2 — Minimal shared MCP wire seam for I339 (2026-11-28; proposed via #1056)
+
+**State: Proposed; effective only on main after protected Network/API/security design review, exact-head applicable CI, both governance validators, maintainer authorization and merge CAS.**
+
+Source: [SEARCH-001-D2-T4 / #1039](../backlog/active/SEARCH-001-D2-T4-mcp-bounded-execution.md), effective I339 claim #1040, and [I339 design proposal](../proposals/i339-bounded-hosted-mcp-execution.md). Maintainer selected option C and the deliberately restricted stateless 2025-06-18 fixture profile on 2026-11-28. This is a narrow additive cross-crate API/ownership decision, not a change to the accepted B/C/D routing architecture or a general permission to add core APIs.
+
+- Permit only the network-free `talos_core::mcp_wire` writer/framing interface explicitly enumerated in the I339 proposal §2, consumed by existing `talos-mcp` and private `talos-tools` code. No new crate, dependency edge, Tool/SDK configuration or transport/provider API. Preserve generic MCP public nominal types and compatibility behavior. Locked dependency/feature proof and generic HTTP/SSE/stdio regression evidence are implementation gates; expanding this API or its ownership requires a new decision.
+- Keep the SearchBackend, search-only lifecycle/profile/result admission and all invocation authority private to `talos-tools`. Reuse SearchTransport and ADR-090 unchanged authority boundary; hosted execution rejects nonzero redirect limits and all 3xx without a second hop. No new permission, private-target exception, proxy behavior, ambient network or retry authority. Retain existing explicit trusted proxy semantics and disclose remote-resolution limitations.
+- I339 is limited to inactive-by-default local synthetic fixtures and the exact bounded stateless profile in the proposal; no claim of general MCP or vendor wire compatibility. No public provider endpoint, route registration, default/Auto behavior, live calls, rights, billing, or regional qualification. No I337/I335 reopening. #848/#624 and all D/E/F/G/I admission gates remain unchanged.
+- This amendment permits only the bounded design after acceptance. Source changes still require effective claim, local convergence, separate protected design/implementation security/API review of actual source, exact-head CI and merge-time CAS; missing evidence blocks completion. A2 does not waive mandatory review or alter ADR-090. Rollback is an isolated reversal of the new capability and additive shared seam, subject to compatibility review.
